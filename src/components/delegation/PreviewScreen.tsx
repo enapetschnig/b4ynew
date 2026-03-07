@@ -1,10 +1,12 @@
-import { Mail, MessageCircle, Edit2, User, Send, ArrowLeft, AlertTriangle, ChevronDown, Volume2, VolumeX } from 'lucide-react';
+import { Mail, MessageCircle, Edit2, User, Send, ArrowLeft, AlertTriangle, ChevronDown, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Draft, Channel, Contact, MediaFile } from '@/types/delegation';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { MediaPicker } from './MediaPicker';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,47 +30,62 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
   const [editedSubject, setEditedSubject] = useState(draft.subject);
   const [editedBody, setEditedBody] = useState(draft.body);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Load voices on mount
-  useEffect(() => {
-    const loadVoices = () => {
-      window.speechSynthesis.getVoices();
-    };
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  const speakText = useCallback(() => {
+  const speakText = useCallback(async () => {
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
       setIsSpeaking(false);
       return;
     }
 
-    const textToSpeak = draft.channel === 'email' 
+    const textToSpeak = draft.channel === 'email'
       ? `Betreff: ${draft.subject}. ${draft.body}`
       : draft.body;
 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    setIsLoadingAudio(true);
 
-    const voices = window.speechSynthesis.getVoices();
-    const germanVoice = voices.find(v => v.lang.startsWith('de')) || voices[0];
-    if (germanVoice) {
-      utterance.voice = germanVoice;
+    try {
+      const { data, error } = await supabase.functions.invoke('text-to-speech', {
+        body: { text: textToSpeak },
+      });
+
+      if (error) throw error;
+
+      // data is the audio blob
+      const blob = new Blob([data], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+        toast.error('Audio-Wiedergabe fehlgeschlagen');
+      };
+
+      setIsSpeaking(true);
+      await audio.play();
+    } catch (e) {
+      console.error('TTS error:', e);
+      toast.error('Vorlesen fehlgeschlagen');
+    } finally {
+      setIsLoadingAudio(false);
     }
-
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
   }, [isSpeaking, draft.subject, draft.body, draft.channel]);
 
   const handleSaveEdit = () => {
@@ -302,10 +319,11 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
               <Button
                 variant="outline"
                 onClick={speakText}
+                disabled={isLoadingAudio}
                 className={`h-14 rounded-xl text-base gap-2 px-4 ${isSpeaking ? 'bg-primary/10 border-primary' : ''}`}
               >
-                {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                {isSpeaking ? 'Stopp' : 'Vorlesen'}
+                {isLoadingAudio ? <Loader2 className="w-5 h-5 animate-spin" /> : isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                {isLoadingAudio ? 'Laden...' : isSpeaking ? 'Stopp' : 'Vorlesen'}
               </Button>
             </>
           )}
