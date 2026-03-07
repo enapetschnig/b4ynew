@@ -1,0 +1,298 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+  DELEGIEREN APP - Design System
+  Corporate, professional, mobile-first design for business delegation
+  
+  Color Philosophy:
+  - Deep slate blues for trust and professionalism
+  - Vibrant accent for primary actions (record, send)
+  - Warm grays for UI surfaces
+  - Clear status colors for feedback
+*/
+
+@layer base {
+  :root {
+    /* Core backgrounds */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 20%;
+    
+    /* Cards and elevated surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+    
+    /* Popover surfaces */
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+    
+    /* Primary - BAU4YOU Red */
+    --primary: 354 70% 48%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary - Warm Slate */
+    --secondary: 215 25% 94%;
+    --secondary-foreground: 222 47% 11%;
+    
+    /* Muted surfaces */
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+    
+    /* Accent - Active/Recording State */
+    --accent: 220 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Destructive */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders and inputs */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 60% 28%;
+    
+    /* Radius */
+    --radius: 0.75rem;
+    
+    /* Sidebar */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5% 26%;
+    --sidebar-primary: 240 6% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 60%;
+    
+    /* Custom app colors */
+    --recording: 0 84% 60%;
+    --recording-glow: 0 100% 70%;
+    --success: 142 72% 40%;
+    --success-foreground: 0 0% 100%;
+    --channel-email: 217 91% 60%;
+    --channel-whatsapp: 142 70% 42%;
+    --processing: 220 70% 50%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(222 60% 28%) 0%, hsl(220 70% 38%) 100%);
+    --gradient-recording: linear-gradient(135deg, hsl(0 84% 55%) 0%, hsl(340 82% 52%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 72% 40%) 0%, hsl(152 69% 45%) 100%);
+    --gradient-surface: linear-gradient(180deg, hsl(210 20% 98%) 0%, hsl(210 25% 96%) 100%);
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.08), 0 2px 4px -2px hsl(222 47% 11% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.08), 0 4px 6px -4px hsl(222 47% 11% / 0.04);
+    --shadow-xl: 0 20px 25px -5px hsl(222 47% 11% / 0.1), 0 8px 10px -6px hsl(222 47% 11% / 0.05);
+    --shadow-glow-recording: 0 0 40px hsl(0 84% 60% / 0.4);
+    --shadow-glow-accent: 0 0 30px hsl(220 70% 50% / 0.3);
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 7%;
+    
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 220 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 213 27% 84%;
+    
+    --sidebar-background: 240 6% 10%;
+    --sidebar-foreground: 240 5% 96%;
+    --sidebar-primary: 224 76% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4% 16%;
+    --sidebar-accent-foreground: 240 5% 96%;
+    --sidebar-border: 240 4% 16%;
+    --sidebar-ring: 217 91% 60%;
+    
+    --recording: 0 84% 60%;
+    --success: 142 72% 45%;
+    --channel-email: 217 91% 65%;
+    --channel-whatsapp: 142 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  /* Large touch-friendly button base */
+  .btn-touch {
+    @apply min-h-[56px] px-8 text-lg font-semibold rounded-xl transition-all duration-200;
+    @apply active:scale-[0.98] touch-manipulation;
+  }
+  
+  /* Recording button styles */
+  .btn-record {
+    @apply relative flex items-center justify-center;
+    @apply w-32 h-32 rounded-full;
+    @apply bg-gradient-to-br from-[hsl(var(--recording))] to-[hsl(340_82%_52%)];
+    @apply text-white font-bold text-xl;
+    @apply shadow-xl transition-all duration-300;
+    @apply active:scale-95 touch-manipulation;
+  }
+  
+  .btn-record.recording {
+    @apply animate-pulse-recording;
+    box-shadow: var(--shadow-glow-recording);
+  }
+  
+  .btn-record::before {
+    content: '';
+    @apply absolute inset-0 rounded-full;
+    @apply bg-white/20 opacity-0 transition-opacity duration-200;
+  }
+  
+  .btn-record:active::before {
+    @apply opacity-100;
+  }
+  
+  /* Channel toggle */
+  .channel-toggle {
+    @apply flex gap-2 p-1.5 bg-secondary rounded-xl;
+  }
+  
+  .channel-btn {
+    @apply flex-1 flex items-center justify-center gap-2;
+    @apply py-4 px-6 rounded-lg font-semibold text-base;
+    @apply transition-all duration-200;
+    @apply text-muted-foreground;
+  }
+  
+  .channel-btn.active {
+    @apply bg-card text-foreground shadow-md;
+  }
+  
+  .channel-btn.email.active {
+    @apply text-[hsl(var(--channel-email))];
+  }
+  
+  .channel-btn.whatsapp.active {
+    @apply text-[hsl(var(--channel-whatsapp))];
+  }
+  
+  /* Status indicators */
+  .status-badge {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium;
+  }
+  
+  .status-recording {
+    @apply bg-[hsl(var(--recording)/0.1)] text-[hsl(var(--recording))];
+  }
+  
+  .status-processing {
+    @apply bg-[hsl(var(--processing)/0.1)] text-[hsl(var(--processing))];
+  }
+  
+  .status-success {
+    @apply bg-[hsl(var(--success)/0.1)] text-[hsl(var(--success))];
+  }
+  
+  /* Card surfaces */
+  .surface-card {
+    @apply bg-card rounded-2xl shadow-md border border-border/50;
+  }
+  
+  .surface-elevated {
+    @apply bg-card rounded-2xl shadow-lg;
+  }
+  
+  /* Preview message box */
+  .message-preview {
+    @apply p-6 bg-secondary/50 rounded-xl border border-border/50;
+    @apply font-mono text-sm leading-relaxed;
+  }
+}
+
+@layer utilities {
+  /* Animations */
+  @keyframes pulse-recording {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 40px hsl(0 84% 60% / 0.4);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 0 60px hsl(0 84% 60% / 0.6);
+    }
+  }
+  
+  .animate-pulse-recording {
+    animation: pulse-recording 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fade-up {
+    animation: fade-up 0.4s ease-out forwards;
+  }
+  
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out forwards;
+  }
+  
+  /* Safe area for mobile */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+}

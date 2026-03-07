@@ -1,0 +1,349 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface Contact {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address_form: 'du' | 'sie' | null;
+}
+
+interface ProcessRequest {
+  transcript: string;
+  channel: "email" | "whatsapp";
+  contacts: Contact[];
+  recipientName?: string;
+  recipientAddress?: string;
+  userSignature?: string;
+}
+
+// Default prompts following Lukasz's specification
+const DEFAULT_EMAIL_PROMPT = `Du bist der persönliche Kommunikationsassistent von Lukasz Baranowski.
+Deine Aufgabe ist es, gesprochene E-Mail-Texte in natürlich klingende, professionelle Geschäftsmails umzuwandeln.
+
+Verbessere ausschließlich Stil, Klarheit und sprachliche Struktur.
+Füge keine neuen Inhalte hinzu und verändere keine Aussagen.
+Dichte nichts dazu und interpretiere nichts.
+Bleibe inhaltlich strikt beim Originaltext.
+
+Der Ton soll sachlich, klar, professionell und menschlich sein.
+Der Text darf nicht auffällig nach KI klingen.
+Verwende keine Floskeln, keine Emojis und keine Sonderzeichen.
+
+Erstelle zusätzlich einen kurzen, sachlichen Betreff, der den Inhalt der E-Mail präzise zusammenfasst.
+Der Betreff wird ausschließlich in das Betreff-Feld eingefügt und nicht im Text wiederholt.
+Der E-Mail-Text beginnt direkt mit der korrekten Anrede.
+
+Es wird keine Signatur erzeugt oder variiert. Die Signatur wird immer einheitlich vom System ergänzt.`;
+
+const DEFAULT_WHATSAPP_PROMPT = `Du bist der persönliche Kommunikationsassistent von Lukasz Baranowski.
+Deine Aufgabe ist es, gesprochene WhatsApp-Nachrichten in klare, professionelle Texte umzuwandeln.
+
+Verbessere ausschließlich Stil, Klarheit und sprachliche Struktur.
+Füge keine neuen Inhalte hinzu und verändere keine Aussagen.
+
+Der Ton soll direkt, klar und professionell sein.
+Der Text darf nicht auffällig nach KI klingen.
+Verwende keine Floskeln, keine Emojis und keine Sonderzeichen.
+
+WICHTIG: Es gibt KEINEN Betreff bei WhatsApp-Nachrichten.
+
+Aufbau der Nachricht:
+- Kurze Anrede (z.B. "Hallo Dijan," oder "Guten Tag Herr Müller,")
+- Kurzer Einstiegssatz
+- Bei Bedarf strukturierte Bulletpoints
+- Keine langen Fließtexte
+
+Abschluss je nach Anredeform:
+- Du-Form: "Liebe Grüße, Lukasz"
+- Sie-Form: "Liebe Grüße, Lukasz Baranowski"
+
+Es wird keine weitere Signatur vom System ergänzt.`;
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { transcript, channel, contacts, recipientName, recipientAddress }: ProcessRequest = await req.json();
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // Get user ID from auth header if available
+  let userId: string | null = null;
+  const isWhatsApp = channel === 'whatsapp';
+  let userPrompt = isWhatsApp ? DEFAULT_WHATSAPP_PROMPT : DEFAULT_EMAIL_PROMPT;
+    let preferredModel = "google/gemini-3-flash-preview";
+
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData } = await supabase.auth.getClaims(token);
+      userId = claimsData?.claims?.sub as string || null;
+
+      if (userId) {
+        // Load user's active prompt based on channel
+        const promptName = isWhatsApp ? 'whatsapp_main' : 'email_main';
+        const { data: promptData } = await supabase
+          .from("prompts")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("name", promptName)
+          .eq("is_active", true)
+          .maybeSingle();
+        
+        if (promptData?.content) {
+          userPrompt = promptData.content;
+        }
+
+        // Load user's preferred model
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("preferred_model")
+          .eq("user_id", userId)
+          .maybeSingle();
+        
+        if (profileData?.preferred_model === "openai") {
+          preferredModel = "openai/gpt-5-mini";
+        }
+      }
+    }
+
+    // Detect address form from transcript
+    const duFormPattern = /in\s+du[- ]?form|duzen|informell/i;
+    const sieFormPattern = /in\s+sie[- ]?form|siezen|förmlich|formell/i;
+    
+    let explicitAddressForm: 'du' | 'sie' | null = null;
+    if (duFormPattern.test(transcript)) {
+      explicitAddressForm = 'du';
+    } else if (sieFormPattern.test(transcript)) {
+      explicitAddressForm = 'sie';
+    }
+
+    // Clean transcript from address form instructions
+    const cleanedTranscript = transcript
+      .replace(/in\s+du[- ]?form/gi, '')
+      .replace(/in\s+sie[- ]?form/gi, '')
+      .trim();
+
+    // Build contact list for matching
+    const contactListStr = contacts.map(c => {
+      const address = channel === 'email' ? c.email : c.phone;
+      const form = c.address_form ? ` [${c.address_form === 'du' ? 'Du-Form' : 'Sie-Form'}]` : '';
+      return `- ${c.name} (${address})${form}`;
+    }).join('\n');
+
+    // Build the processing prompt
+    const addressFormInstruction = explicitAddressForm 
+      ? `\n\nANREDEFORM: ${explicitAddressForm === 'du' ? 'Du-Form' : 'Sie-Form'} - Diese Form ist verbindlich anzuwenden.`
+      : '\n\nANREDEFORM: Bestimme die passende Anredeform basierend auf der Kontaktliste oder dem Kontext.';
+
+    const parsePrompt = channel === "email" 
+      ? `${userPrompt}
+${addressFormInstruction}
+
+WICHTIG: Extrahiere zuerst den Namen des Empfängers aus dem Transkript. Der Sprecher sagt oft "An [Name]", "Schreib an [Name]", "Für [Name]" oder ähnliches am Anfang.
+
+Verfügbare Kontakte:
+${contactListStr || 'Keine Kontakte verfügbar'}
+
+Transkript: "${cleanedTranscript}"
+${recipientName ? `Vorausgewählter Empfänger: ${recipientName}` : ''}
+
+Aufgaben:
+1. Finde den genannten Empfänger im Transkript und matche ihn mit der Kontaktliste
+2. Entferne die Empfänger-Nennung aus dem eigentlichen Nachrichteninhalt
+3. Bestimme die Anredeform: Explizit angegeben > Kontakt-Einstellung > Default Sie-Form
+4. Erstelle den E-Mail-Text gemäß den obigen Anweisungen
+
+WICHTIGE REGELN:
+- Keine Aufzählungen im E-Mail-Text
+- Keine Emojis oder Sonderzeichen
+- Keine Signatur am Ende (wird vom System hinzugefügt)
+- Betreff maximal 8 Wörter, sachlich und präzise
+
+Anrede-Beispiele:
+- Du-Form: "Hallo Christoph," oder "Hi Dijan,"
+- Sie-Form: "Sehr geehrter Herr Wagner," oder "Guten Tag Herr Müller,"
+
+Antworte NUR im folgenden JSON-Format:
+{
+  "detectedRecipient": "Name aus Transkript (exakt wie gesprochen)",
+  "matchedContact": "Vollständiger Name aus Kontaktliste oder null wenn kein Match",
+  "addressForm": "du" oder "sie",
+  "subject": "Betreffzeile",
+  "body": "Vollständiger E-Mail-Text ohne Signatur",
+  "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
+}`
+      : `${userPrompt}
+${addressFormInstruction}
+
+WICHTIG: Extrahiere zuerst den Namen des Empfängers aus dem Transkript.
+
+Verfügbare Kontakte:
+${contactListStr || 'Keine Kontakte verfügbar'}
+
+Transkript: "${cleanedTranscript}"
+${recipientName ? `Vorausgewählter Empfänger: ${recipientName}` : ''}
+
+Aufgaben:
+1. Finde den genannten Empfänger im Transkript und matche ihn mit der Kontaktliste
+2. Entferne die Empfänger-Nennung aus dem eigentlichen Nachrichteninhalt
+3. Bestimme die Anredeform: Explizit angegeben > Kontakt-Einstellung > Default Sie-Form
+4. Erstelle den WhatsApp-Text gemäß den obigen Anweisungen
+
+WICHTIGE REGELN:
+- KEIN Betreff bei WhatsApp
+- Bulletpoints sind erlaubt
+- Signatur je nach Anredeform im Text enthalten ("Liebe Grüße, Lukasz" oder "Liebe Grüße, Lukasz Baranowski")
+
+Antworte NUR im folgenden JSON-Format:
+{
+  "detectedRecipient": "Name aus Transkript (exakt wie gesprochen)",
+  "matchedContact": "Vollständiger Name aus Kontaktliste oder null wenn kein Match",
+  "addressForm": "du" oder "sie",
+  "body": "Vollständiger WhatsApp-Text mit Signatur",
+  "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
+}`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: preferredModel,
+        messages: [
+          { role: "system", content: "Du bist ein präziser Assistent für Geschäftskommunikation. Antworte immer nur mit validem JSON." },
+          { role: "user", content: parsePrompt }
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limits exceeded, please try again later." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Payment required, please add funds to your Lovable AI workspace." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      throw new Error(`AI gateway error: ${response.status}`);
+    }
+
+    const aiResponse = await response.json();
+    const content = aiResponse.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("No content in AI response");
+    }
+
+    // Parse the JSON response - handle markdown code blocks and extract JSON
+    let jsonContent = content.trim();
+    
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonContent = jsonMatch[1].trim();
+    }
+    
+    if (!jsonContent.startsWith('{')) {
+      const jsonObjectMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        jsonContent = jsonObjectMatch[0];
+      }
+    }
+    
+    let draft;
+    try {
+      draft = JSON.parse(jsonContent);
+    } catch (parseError) {
+      console.error("Failed to parse AI response as JSON:", content);
+      return new Response(JSON.stringify({
+        subject: "",
+        body: content,
+        summary: "Konnte Nachricht nicht strukturieren",
+        channel,
+        detectedRecipient: null,
+        matchedContact: null,
+        recipientName: null,
+        recipientAddress: null,
+        originalTranscript: transcript,
+        addressForm: 'sie',
+        parseError: true,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Find the matched contact from the list
+    let matchedContactData: Contact | null = null;
+    if (draft.matchedContact) {
+      matchedContactData = contacts.find(c => 
+        c.name.toLowerCase() === draft.matchedContact.toLowerCase() ||
+        c.name.toLowerCase().includes(draft.matchedContact.toLowerCase()) ||
+        draft.matchedContact.toLowerCase().includes(c.name.toLowerCase())
+      ) || null;
+    }
+
+    // Determine final address form: explicit > contact setting > AI decision > default 'sie'
+    let finalAddressForm = explicitAddressForm 
+      || matchedContactData?.address_form 
+      || draft.addressForm 
+      || 'sie';
+
+    // Determine final recipient
+    const finalRecipientName = recipientName || matchedContactData?.name || draft.detectedRecipient || null;
+    const finalRecipientAddress = recipientAddress || 
+      (channel === 'email' ? matchedContactData?.email : matchedContactData?.phone) || 
+      null;
+
+    return new Response(JSON.stringify({
+      subject: draft.subject || "",
+      body: draft.body,
+      summary: draft.summary,
+      channel,
+      detectedRecipient: draft.detectedRecipient,
+      matchedContact: matchedContactData,
+      recipientName: finalRecipientName,
+      recipientAddress: finalRecipientAddress,
+      originalTranscript: transcript,
+      addressForm: finalAddressForm,
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (error) {
+    console.error("Process delegation error:", error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
