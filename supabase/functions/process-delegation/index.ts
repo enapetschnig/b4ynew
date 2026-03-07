@@ -136,9 +136,8 @@ serve(async (req) => {
         global: { headers: { Authorization: authHeader } },
       });
       
-      const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData } = await supabase.auth.getClaims(token);
-      userId = claimsData?.claims?.sub as string || null;
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
 
       if (userId) {
         // Load user's active prompt based on channel
