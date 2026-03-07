@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.text-to-speech]
 verify_jwt = false
+
+[functions.hero-export]
+verify_jwt = false
+
+[functions.hero-filter]
+verify_jwt = false

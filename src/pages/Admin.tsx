@@ -1,7 +1,6 @@
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, ArrowLeft, Users, MessageSquare, Settings, ChevronRight, UserCog } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Loader2, Users, MessageSquare, Settings, ChevronRight, UserCog } from 'lucide-react';
 import logo from '@/assets/logo-bau4you.png';
 
 interface AdminMenuItem {
@@ -58,19 +57,9 @@ export default function Admin() {
   return (
     <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
       {/* Header */}
-      <header className="px-6 py-4 flex items-center justify-between border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate('/delegieren')} 
-            className="rounded-full"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <img src={logo} alt="BAU4YOU" className="h-8 w-auto cursor-pointer" onClick={() => navigate('/delegieren')} />
-          <span className="font-display font-bold text-lg text-foreground">Admin</span>
-        </div>
+      <header className="px-6 py-4 flex items-center gap-3 border-b border-border/50">
+        <img src={logo} alt="BAU4YOU" className="h-8 w-auto" />
+        <span className="font-display font-bold text-lg text-foreground">Admin</span>
       </header>
 
       {/* Menu */}

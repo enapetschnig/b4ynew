@@ -5,7 +5,7 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { LogOut, Loader2, Settings, Cloud, MessageCircle } from 'lucide-react';
+import { LogOut, Loader2, Cloud, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChannelToggle } from '@/components/delegation/ChannelToggle';
 import { RecordButton } from '@/components/delegation/RecordButton';
@@ -404,14 +404,9 @@ export default function Delegieren() {
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/admin')} className="rounded-full">
-            <Settings className="w-5 h-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={signOut} className="rounded-full">
-            <LogOut className="w-5 h-5" />
-          </Button>
-        </div>
+        <Button variant="ghost" size="icon" onClick={signOut} className="rounded-full">
+          <LogOut className="w-5 h-5" />
+        </Button>
       </header>
 
       <main className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">

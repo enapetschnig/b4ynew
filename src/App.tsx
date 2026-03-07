@@ -8,8 +8,11 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InstallPromptDialog } from "@/components/InstallPromptDialog";
+import { AppLayout } from "./components/AppLayout";
 import Login from "./pages/Login";
 import Delegieren from "./pages/Delegieren";
+import Preisliste from "./pages/Preisliste";
+import Angebote from "./pages/Angebote";
 import Admin from "./pages/Admin";
 import AdminContacts from "./pages/AdminContacts";
 import AdminSettings from "./pages/AdminSettings";
@@ -39,14 +42,16 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Navigate to="/delegieren" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/delegieren" element={<Delegieren />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/admin/kontakte" element={<AdminContacts />} />
-          <Route path="/admin/benutzer" element={<AdminUsers />} />
-          <Route path="/admin/nachrichten" element={<AdminMessages />} />
-          <Route path="/admin/nachrichten/:id" element={<AdminMessageDetail />} />
-          <Route path="/admin/einstellungen" element={<AdminSettings />} />
-          <Route path="/admin/prompts" element={<AdminPrompts />} />
+          <Route path="/delegieren" element={<AppLayout><Delegieren /></AppLayout>} />
+          <Route path="/preisliste" element={<AppLayout><Preisliste /></AppLayout>} />
+          <Route path="/angebote" element={<AppLayout><Angebote /></AppLayout>} />
+          <Route path="/admin" element={<AppLayout><Admin /></AppLayout>} />
+          <Route path="/admin/kontakte" element={<AppLayout><AdminContacts /></AppLayout>} />
+          <Route path="/admin/benutzer" element={<AppLayout><AdminUsers /></AppLayout>} />
+          <Route path="/admin/nachrichten" element={<AppLayout><AdminMessages /></AppLayout>} />
+          <Route path="/admin/nachrichten/:id" element={<AppLayout><AdminMessageDetail /></AppLayout>} />
+          <Route path="/admin/einstellungen" element={<AppLayout><AdminSettings /></AppLayout>} />
+          <Route path="/admin/prompts" element={<AppLayout><AdminPrompts /></AppLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
