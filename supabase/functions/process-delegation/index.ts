@@ -201,8 +201,7 @@ serve(async (req) => {
       ? `\n\nANREDEFORM: ${explicitAddressForm === 'du' ? 'Du-Form' : 'Sie-Form'} - Diese Form ist verbindlich anzuwenden.`
       : '\n\nANREDEFORM: Bestimme die passende Anredeform basierend auf der Kontaktliste oder dem Kontext.';
 
-    const parsePrompt = channel === "email" 
-      ? `${userPrompt}
+    const parsePrompt = `${userPrompt}
 ${addressFormInstruction}
 
 WICHTIG: Extrahiere zuerst den Namen des Empfängers aus dem Transkript. Der Sprecher sagt oft "An [Name]", "Schreib an [Name]", "Für [Name]" oder ähnliches am Anfang.
@@ -217,55 +216,15 @@ Aufgaben:
 1. Finde den genannten Empfänger im Transkript und matche ihn mit der Kontaktliste
 2. Entferne die Empfänger-Nennung aus dem eigentlichen Nachrichteninhalt
 3. Bestimme die Anredeform: Explizit angegeben > Kontakt-Einstellung > Default Sie-Form
-4. Erstelle den E-Mail-Text gemäß den obigen Anweisungen
-
-WICHTIGE REGELN:
-- Keine Aufzählungen im E-Mail-Text
-- Keine Emojis oder Sonderzeichen
-- Keine Signatur am Ende (wird vom System hinzugefügt)
-- Betreff maximal 8 Wörter, sachlich und präzise
-
-Anrede-Beispiele:
-- Du-Form: "Hallo Christoph," oder "Hi Dijan,"
-- Sie-Form: "Sehr geehrter Herr Wagner," oder "Guten Tag Herr Müller,"
+4. Erstelle den Nachrichtentext gemäß den obigen Anweisungen
 
 Antworte NUR im folgenden JSON-Format:
 {
   "detectedRecipient": "Name aus Transkript (exakt wie gesprochen)",
   "matchedContact": "Vollständiger Name aus Kontaktliste oder null wenn kein Match",
   "addressForm": "du" oder "sie",
-  "subject": "Betreffzeile",
-  "body": "Vollständiger E-Mail-Text ohne Signatur",
-  "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
-}`
-      : `${userPrompt}
-${addressFormInstruction}
-
-WICHTIG: Extrahiere zuerst den Namen des Empfängers aus dem Transkript.
-
-Verfügbare Kontakte:
-${contactListStr || 'Keine Kontakte verfügbar'}
-
-Transkript: "${cleanedTranscript}"
-${recipientName ? `Vorausgewählter Empfänger: ${recipientName}` : ''}
-
-Aufgaben:
-1. Finde den genannten Empfänger im Transkript und matche ihn mit der Kontaktliste
-2. Entferne die Empfänger-Nennung aus dem eigentlichen Nachrichteninhalt
-3. Bestimme die Anredeform: Explizit angegeben > Kontakt-Einstellung > Default Sie-Form
-4. Erstelle den WhatsApp-Text gemäß den obigen Anweisungen
-
-WICHTIGE REGELN:
-- KEIN Betreff bei WhatsApp
-- Bulletpoints sind erlaubt
-- Signatur je nach Anredeform im Text enthalten ("Liebe Grüße, Lukasz" oder "Liebe Grüße, Lukasz Baranowski")
-
-Antworte NUR im folgenden JSON-Format:
-{
-  "detectedRecipient": "Name aus Transkript (exakt wie gesprochen)",
-  "matchedContact": "Vollständiger Name aus Kontaktliste oder null wenn kein Match",
-  "addressForm": "du" oder "sie",
-  "body": "Vollständiger WhatsApp-Text mit Signatur",
+  "subject": "Betreffzeile (falls im Prompt gefordert, sonst leer)",
+  "body": "Vollständiger Nachrichtentext",
   "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
 }`;
 
