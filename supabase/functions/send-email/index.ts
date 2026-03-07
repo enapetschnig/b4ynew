@@ -12,6 +12,7 @@ interface SendEmailRequest {
   body: string;
   signature?: string;
   recipientName?: string;
+  senderName?: string;
   replyTo?: string;
   webhookUrl: string;
 }
@@ -38,7 +39,7 @@ serve(async (req) => {
   }
 
   try {
-    const { to, from, subject, body, signature, recipientName, replyTo, webhookUrl }: SendEmailRequest = await req.json();
+    const { to, from, subject, body, signature, recipientName, senderName, replyTo, webhookUrl }: SendEmailRequest = await req.json();
 
     if (!to || !subject || !body || !webhookUrl) {
       return new Response(
@@ -49,14 +50,19 @@ serve(async (req) => {
 
     const html = buildSimpleHtml(body, signature);
 
-    console.log(`Sending email to ${to}, subject: "${subject}", via webhook`);
+    // Format from as "Display Name <email>" if both are provided
+    const formattedFrom = from
+      ? (senderName ? `${senderName} <${from}>` : from)
+      : undefined;
+
+    console.log(`Sending email to ${to}, from: ${formattedFrom}, subject: "${subject}"`);
 
     const webhookResponse = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         to,
-        from: from || undefined,
+        from: formattedFrom,
         subject,
         html,
         recipient_name: recipientName || undefined,

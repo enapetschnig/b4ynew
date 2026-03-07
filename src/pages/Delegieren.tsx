@@ -34,6 +34,7 @@ export default function Delegieren() {
   const [hasWhapiToken, setHasWhapiToken] = useState(false);
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string | null>(null);
   const [smtpFromEmail, setSmtpFromEmail] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -56,6 +57,7 @@ export default function Delegieren() {
         setHasWhapiToken(!!data.whapi_token);
         if (data.n8n_webhook_url) setN8nWebhookUrl(data.n8n_webhook_url);
         if (data.smtp_from_email) setSmtpFromEmail(data.smtp_from_email);
+        if (data.display_name) setDisplayName(data.display_name);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -248,6 +250,7 @@ export default function Delegieren() {
             body: draft.body,
             signature: signature || undefined,
             recipientName: draft.recipientName,
+            senderName: displayName || undefined,
             replyTo: replyToEmail || undefined,
             webhookUrl: n8nWebhookUrl,
           },

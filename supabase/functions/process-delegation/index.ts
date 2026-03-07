@@ -262,6 +262,7 @@ Antworte NUR im folgenden JSON-Format:
     let draft;
     try {
       draft = JSON.parse(jsonContent);
+      console.log(`AI response parsed: subject="${draft.subject || ''}", addressForm="${draft.addressForm}", matchedContact="${draft.matchedContact}", promptSource=${promptSource}`);
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", content);
       return new Response(JSON.stringify({
