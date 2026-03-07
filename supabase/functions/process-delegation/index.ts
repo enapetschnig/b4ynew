@@ -127,13 +127,14 @@ serve(async (req) => {
     const isWhatsApp = channel === 'whatsapp';
     let userPrompt = isWhatsApp ? DEFAULT_WHATSAPP_PROMPT : DEFAULT_EMAIL_PROMPT;
     let preferredModel = "gemini";
+    let promptSource = "default";
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader && SUPABASE_URL && SUPABASE_ANON_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         global: { headers: { Authorization: authHeader } },
       });
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       userId = user?.id || null;
 
@@ -152,6 +153,7 @@ serve(async (req) => {
 
         if (promptData?.content) {
           userPrompt = promptData.content;
+          promptSource = "custom";
           console.log(`Using custom prompt (${promptData.content.length} chars)`);
         } else {
           console.log("Using default prompt");
@@ -163,7 +165,7 @@ serve(async (req) => {
           .select("preferred_model")
           .eq("user_id", userId)
           .maybeSingle();
-        
+
         if (profileData?.preferred_model) {
           preferredModel = profileData.preferred_model;
         }
@@ -213,15 +215,16 @@ ${recipientName ? `Vorausgewählter Empfänger: ${recipientName}` : ''}
 Aufgaben:
 1. Finde den genannten Empfänger im Transkript und matche ihn mit der Kontaktliste
 2. Entferne die Empfänger-Nennung aus dem eigentlichen Nachrichteninhalt
-3. Bestimme die Anredeform: Explizit angegeben > Kontakt-Einstellung > Default Sie-Form
+3. Bestimme die Anredeform: Wenn der gematchte Kontakt [Du-Form] oder [Sie-Form] hat, verwende DIESE Form verbindlich für Anrede, Text und Abschluss. Sonst: Explizit im Transkript angegeben > Default Sie-Form
 4. Erstelle den Nachrichtentext gemäß den obigen Anweisungen
+5. Erstelle IMMER einen kurzen, prägnanten Betreff der den Inhalt zusammenfasst
 
 Antworte NUR im folgenden JSON-Format:
 {
-  "detectedRecipient": "Name aus Transkript (exakt wie gesprochen)",
-  "matchedContact": "Vollständiger Name aus Kontaktliste oder null wenn kein Match",
+  "detectedRecipient": "Name aus Transkript",
+  "matchedContact": "Vollständiger Name aus Kontaktliste oder null",
   "addressForm": "du" oder "sie",
-  "subject": "Betreffzeile (falls im Prompt gefordert, sonst leer)",
+  "subject": "PFLICHTFELD - Betreff der den Inhalt zusammenfasst",
   "body": "Vollständiger Nachrichtentext",
   "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
 }`;
@@ -311,6 +314,7 @@ Antworte NUR im folgenden JSON-Format:
       recipientAddress: finalRecipientAddress,
       originalTranscript: transcript,
       addressForm: finalAddressForm,
+      promptSource,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
