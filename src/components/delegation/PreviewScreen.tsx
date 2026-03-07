@@ -47,6 +47,7 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
       ? `Betreff: ${draft.subject}. ${draft.body}`
       : draft.body;
 
+    console.log(`TTS request: channel=${draft.channel}, textLength=${textToSpeak.length}, text="${textToSpeak.substring(0, 100)}..."`);
     setIsLoadingAudio(true);
 
     try {
