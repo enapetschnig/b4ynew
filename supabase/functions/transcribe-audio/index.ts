@@ -78,7 +78,7 @@ serve(async (req) => {
     console.log("Transcribing audio with Gemini, MIME type:", mimeType, "size:", arrayBuffer.byteLength);
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,7 +118,7 @@ Transkript:`
     const geminiResponse = await response.json();
     const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       text,
       source: "gemini"
     }), {
