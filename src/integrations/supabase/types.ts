@@ -183,9 +183,11 @@ export type Database = {
           display_name: string | null
           id: string
           is_active: boolean | null
+          n8n_webhook_url: string | null
           preferred_model: string | null
           reply_to_email: string | null
           signature: string | null
+          smtp_from_email: string | null
           updated_at: string
           user_id: string
           whapi_token: string | null
@@ -197,9 +199,11 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_active?: boolean | null
+          n8n_webhook_url?: string | null
           preferred_model?: string | null
           reply_to_email?: string | null
           signature?: string | null
+          smtp_from_email?: string | null
           updated_at?: string
           user_id: string
           whapi_token?: string | null
@@ -211,9 +215,11 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_active?: boolean | null
+          n8n_webhook_url?: string | null
           preferred_model?: string | null
           reply_to_email?: string | null
           signature?: string | null
+          smtp_from_email?: string | null
           updated_at?: string
           user_id?: string
           whapi_token?: string | null

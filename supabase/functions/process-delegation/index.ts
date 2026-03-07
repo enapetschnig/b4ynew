@@ -66,6 +66,52 @@ Abschluss je nach Anredeform:
 
 Es wird keine weitere Signatur vom System ergänzt.`;
 
+// Call Gemini API directly
+async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
+      }),
+    }
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Gemini API error:", response.status, errorText);
+    throw new Error(`Gemini API error: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
+// Call OpenAI API directly
+async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+    }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("OpenAI API error:", response.status, errorText);
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -73,19 +119,16 @@ serve(async (req) => {
 
   try {
     const { transcript, channel, contacts, recipientName, recipientAddress }: ProcessRequest = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     // Get user ID from auth header if available
-  let userId: string | null = null;
-  const isWhatsApp = channel === 'whatsapp';
-  let userPrompt = isWhatsApp ? DEFAULT_WHATSAPP_PROMPT : DEFAULT_EMAIL_PROMPT;
-    let preferredModel = "google/gemini-3-flash-preview";
+    let userId: string | null = null;
+    const isWhatsApp = channel === 'whatsapp';
+    let userPrompt = isWhatsApp ? DEFAULT_WHATSAPP_PROMPT : DEFAULT_EMAIL_PROMPT;
+    let preferredModel = "gemini";
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader && SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -119,8 +162,8 @@ serve(async (req) => {
           .eq("user_id", userId)
           .maybeSingle();
         
-        if (profileData?.preferred_model === "openai") {
-          preferredModel = "openai/gpt-5-mini";
+        if (profileData?.preferred_model) {
+          preferredModel = profileData.preferred_model;
         }
       }
     }
@@ -222,42 +265,16 @@ Antworte NUR im folgenden JSON-Format:
   "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: preferredModel,
-        messages: [
-          { role: "system", content: "Du bist ein präziser Assistent für Geschäftskommunikation. Antworte immer nur mit validem JSON." },
-          { role: "user", content: parsePrompt }
-        ],
-        temperature: 0.3,
-      }),
-    });
+    const systemPrompt = "Du bist ein präziser Assistent für Geschäftskommunikation. Antworte immer nur mit validem JSON.";
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limits exceeded, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required, please add funds to your Lovable AI workspace." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+    let content: string;
+    if (preferredModel === "openai" && OPENAI_API_KEY) {
+      content = await callOpenAI(OPENAI_API_KEY, systemPrompt, parsePrompt);
+    } else if (GEMINI_API_KEY) {
+      content = await callGemini(GEMINI_API_KEY, systemPrompt, parsePrompt);
+    } else {
+      throw new Error("Kein API-Key konfiguriert. Bitte GEMINI_API_KEY oder OPENAI_API_KEY als Edge Function Secret setzen.");
     }
-
-    const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content;
 
     if (!content) {
       throw new Error("No content in AI response");

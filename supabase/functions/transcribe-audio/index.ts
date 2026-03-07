@@ -43,8 +43,8 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("ElevenLabs STT error:", response.status, errorText);
-        // Fall through to Lovable AI fallback on permission/auth errors
-        console.log("Falling back to Lovable AI for transcription...");
+        // Fall through to Gemini fallback on permission/auth errors
+        console.log("Falling back to Gemini for transcription...");
       } else {
         const transcription = await response.json();
         
@@ -57,15 +57,13 @@ serve(async (req) => {
       }
     }
 
-    // Fallback: Use Lovable AI with Gemini for transcription
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
-      throw new Error("No transcription service configured");
+    // Fallback: Use Gemini API directly for transcription
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+
+    if (!GEMINI_API_KEY) {
+      throw new Error("No transcription service configured. Set ELEVENLABS_API_KEY or GEMINI_API_KEY.");
     }
 
-    // Convert audio to base64 for Gemini
-    // Use chunked approach to avoid stack overflow with large files
     const arrayBuffer = await audioFile.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     let base64Audio = "";
@@ -76,24 +74,19 @@ serve(async (req) => {
     }
     base64Audio = btoa(base64Audio);
 
-    // Determine correct MIME type
     const mimeType = audioFile.type || "audio/webm";
-    console.log("Transcribing audio with MIME type:", mimeType, "size:", arrayBuffer.byteLength);
+    console.log("Transcribing audio with Gemini, MIME type:", mimeType, "size:", arrayBuffer.byteLength);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
             role: "user",
-            content: [
+            parts: [
               {
-                type: "text",
                 text: `Du erhältst eine deutsche Sprachaufnahme. Transkribiere sie WORTGETREU.
 
 WICHTIG:
@@ -105,29 +98,25 @@ WICHTIG:
 Transkript:`
               },
               {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64Audio}`
-                }
-              }
-            ]
-          }
-        ],
-      }),
-    });
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Audio,
+                },
+              },
+            ],
+          }],
+        }),
+      }
+    );
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limits exceeded" }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI transcription error: ${response.status}`);
+      const errorText = await response.text();
+      console.error("Gemini transcription error:", response.status, errorText);
+      throw new Error(`Gemini transcription error: ${response.status}`);
     }
 
-    const aiResponse = await response.json();
-    const text = aiResponse.choices?.[0]?.message?.content || "";
+    const geminiResponse = await response.json();
+    const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     return new Response(JSON.stringify({ 
       text,
