@@ -32,6 +32,8 @@ interface Material {
   quantity: number;
   unit_type: string;
   net_price_per_unit: number;
+  base_price: number;
+  list_price: number;
 }
 
 interface Product {
@@ -41,6 +43,11 @@ interface Product {
   list_price: number;
   vat_percent: number;
   is_deleted: boolean;
+  price_quantity: number;
+  quantity_min: number;
+  quantity_interval: number;
+  delivery_time: string;
+  attributes: Record<string, unknown>[];
   base_data: {
     name: string;
     description: string;
@@ -634,7 +641,11 @@ export default function Preisliste() {
                           {s.materials.map((m, mi) => (
                             <div key={mi} className="flex items-center justify-between text-xs text-muted-foreground bg-secondary/30 rounded px-2 py-1">
                               <span>{m.quantity}x {m.name} ({m.unit_type})</span>
-                              <span className="font-mono">{m.net_price_per_unit?.toFixed(2)} €</span>
+                              <span className="font-mono flex gap-2">
+                                {m.base_price != null && <span>EK {m.base_price.toFixed(2)}€</span>}
+                                {m.list_price != null && <span>VK {m.list_price.toFixed(2)}€</span>}
+                                {m.base_price == null && m.list_price == null && <span>{m.net_price_per_unit?.toFixed(2)} €</span>}
+                              </span>
                             </div>
                           ))}
                         </div>

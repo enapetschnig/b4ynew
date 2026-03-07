@@ -73,7 +73,7 @@ async function fetchAllServices(apiKey: string) {
         positions {
           __typename
           ... on Documents_SupplyProduct {
-            id nr name quantity unit_type net_price_per_unit
+            id nr name quantity unit_type net_price_per_unit base_price list_price
           }
         }
       }
@@ -113,7 +113,7 @@ async function fetchAllProducts(apiKey: string) {
     const q = `query($first: Int, $offset: Int) {
       supply_product_versions(first: $first, offset: $offset) {
         nr internal_identifier base_price list_price vat_percent
-        is_deleted
+        is_deleted price_quantity quantity_min quantity_interval delivery_time attributes
         base_data {
           name description category unit_type manufacturer manufacturer_nr
         }

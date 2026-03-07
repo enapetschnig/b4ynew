@@ -32,13 +32,15 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isSpeakingRef = useRef(false);
 
   const speakText = useCallback(async () => {
-    if (isSpeaking) {
+    if (isSpeakingRef.current) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
+      isSpeakingRef.current = false;
       setIsSpeaking(false);
       return;
     }
@@ -85,24 +87,29 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
       audioRef.current = audio;
 
       audio.onended = () => {
+        isSpeakingRef.current = false;
         setIsSpeaking(false);
         URL.revokeObjectURL(url);
       };
       audio.onerror = () => {
+        isSpeakingRef.current = false;
         setIsSpeaking(false);
         URL.revokeObjectURL(url);
         toast.error('Audio-Wiedergabe fehlgeschlagen');
       };
 
+      isSpeakingRef.current = true;
       setIsSpeaking(true);
       await audio.play();
     } catch (e) {
       console.error('TTS error:', e);
+      isSpeakingRef.current = false;
+      setIsSpeaking(false);
       toast.error('Vorlesen fehlgeschlagen');
     } finally {
       setIsLoadingAudio(false);
     }
-  }, [isSpeaking, draft.subject, draft.body, draft.channel]);
+  }, [draft.subject, draft.body, draft.channel]);
 
   const handleSaveEdit = () => {
     onEdit({
@@ -241,7 +248,7 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
 
         {/* Message Content */}
         <div className="space-y-4">
-          {(draft.channel === 'email' || draft.subject) && (
+          {(draft.channel === 'email' || draft.channel === 'whatsapp') && (
             <div>
               <p className="text-sm text-muted-foreground mb-2">Betreff</p>
               {isEditing ? (
