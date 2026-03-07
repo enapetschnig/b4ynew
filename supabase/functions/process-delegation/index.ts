@@ -142,16 +142,21 @@ serve(async (req) => {
       if (userId) {
         // Load user's active prompt based on channel
         const promptName = isWhatsApp ? 'whatsapp_main' : 'email_main';
-        const { data: promptData } = await supabase
+        const { data: promptData, error: promptError } = await supabase
           .from("prompts")
           .select("content")
           .eq("user_id", userId)
           .eq("name", promptName)
           .eq("is_active", true)
           .maybeSingle();
-        
+
+        console.log(`Prompt loading: userId=${userId}, name=${promptName}, found=${!!promptData?.content}, error=${promptError?.message || 'none'}`);
+
         if (promptData?.content) {
           userPrompt = promptData.content;
+          console.log(`Using custom prompt (${promptData.content.length} chars)`);
+        } else {
+          console.log("Using default prompt");
         }
 
         // Load user's preferred model

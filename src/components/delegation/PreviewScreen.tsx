@@ -50,14 +50,25 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
     setIsLoadingAudio(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('text-to-speech', {
-        body: { text: textToSpeak },
-      });
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ text: textToSpeak }),
+        }
+      );
 
-      // data is the audio blob
-      const blob = new Blob([data], { type: 'audio/mpeg' });
+      if (!response.ok) throw new Error('TTS fehlgeschlagen');
+
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
 
       if (audioRef.current) {
