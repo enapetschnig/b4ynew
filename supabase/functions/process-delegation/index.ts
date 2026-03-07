@@ -304,8 +304,11 @@ Antworte NUR im folgenden JSON-Format:
       (channel === 'email' ? matchedContactData?.email : matchedContactData?.phone) || 
       null;
 
+    // Fallback: if AI didn't generate a subject, derive one from summary
+    const finalSubject = draft.subject || draft.summary?.split('.')[0]?.trim() || "Nachricht";
+
     return new Response(JSON.stringify({
-      subject: draft.subject || "",
+      subject: finalSubject,
       body: draft.body,
       summary: draft.summary,
       channel,

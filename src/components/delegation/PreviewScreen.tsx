@@ -66,7 +66,11 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
         }
       );
 
-      if (!response.ok) throw new Error('TTS fehlgeschlagen');
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.error('TTS response error:', response.status, errText);
+        throw new Error(`TTS fehlgeschlagen (${response.status})`);
+      }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
