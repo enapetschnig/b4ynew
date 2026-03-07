@@ -332,7 +332,7 @@ export default function Delegieren() {
         const whatsappResponse = await supabase.functions.invoke('send-whatsapp', {
           body: {
             to: draft.recipientAddress,
-            body: draft.body,
+            body: draft.subject ? `Betreff: ${draft.subject}\n\n${draft.body}` : draft.body,
             recipientName: draft.recipientName,
             contactId: draft.recipient?.id,
             mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,

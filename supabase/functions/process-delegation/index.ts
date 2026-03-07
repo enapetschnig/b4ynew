@@ -52,8 +52,6 @@ Der Ton soll direkt, klar und professionell sein.
 Der Text darf nicht auffällig nach KI klingen.
 Verwende keine Floskeln, keine Emojis und keine Sonderzeichen.
 
-WICHTIG: Es gibt KEINEN Betreff bei WhatsApp-Nachrichten.
-
 Aufbau der Nachricht:
 - Kurze Anrede (z.B. "Hallo Dijan," oder "Guten Tag Herr Müller,")
 - Kurzer Einstiegssatz

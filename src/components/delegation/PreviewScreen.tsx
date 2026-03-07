@@ -43,7 +43,7 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
       return;
     }
 
-    const textToSpeak = draft.channel === 'email'
+    const textToSpeak = draft.subject
       ? `Betreff: ${draft.subject}. ${draft.body}`
       : draft.body;
 
@@ -236,7 +236,7 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
 
         {/* Message Content */}
         <div className="space-y-4">
-          {draft.channel === 'email' && (
+          {(draft.channel === 'email' || draft.subject) && (
             <div>
               <p className="text-sm text-muted-foreground mb-2">Betreff</p>
               {isEditing ? (
