@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "resend";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,11 +7,29 @@ const corsHeaders = {
 
 interface SendEmailRequest {
   to: string;
+  from?: string;
   subject: string;
   body: string;
-  recipientName: string;
-  senderName?: string;
+  signature?: string;
+  recipientName?: string;
   replyTo?: string;
+  webhookUrl: string;
+}
+
+function buildSimpleHtml(body: string, signature?: string): string {
+  const escapeHtml = (str: string) =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const bodyHtml = escapeHtml(body).replace(/\n/g, '<br>');
+  const signatureHtml = signature
+    ? `<br><br><span style="color:#666;">${escapeHtml(signature).replace(/\n/g, '<br>')}</span>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#333;">
+${bodyHtml}${signatureHtml}
+</body></html>`;
 }
 
 serve(async (req) => {
@@ -21,79 +38,52 @@ serve(async (req) => {
   }
 
   try {
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    
-    if (!RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY is not configured");
-    }
+    const { to, from, subject, body, signature, recipientName, replyTo, webhookUrl }: SendEmailRequest = await req.json();
 
-    const resend = new Resend(RESEND_API_KEY);
-    const { to, subject, body, recipientName, senderName, replyTo }: SendEmailRequest = await req.json();
-
-    if (!to || !subject || !body) {
+    if (!to || !subject || !body || !webhookUrl) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: to, subject, body" }),
+        JSON.stringify({ error: "Missing required fields: to, subject, body, webhookUrl" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Format body with line breaks for HTML
-    const htmlBody = body
-      .replace(/\n/g, '<br>')
-      .replace(/•/g, '&bull;');
+    const html = buildSimpleHtml(body, signature);
 
-    // Build email options
-    const emailOptions: any = {
-      from: `${senderName || 'Delegieren'} <info@chrisnapetschnig.at>`,
-      to: [to],
-      subject: subject,
-      html: `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="padding: 20px 0;">
-              ${htmlBody}
-            </div>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-            <p style="font-size: 12px; color: #999;">
-              Gesendet von ${senderName || 'Delegieren'}
-            </p>
-          </body>
-        </html>
-      `,
-      text: body,
-    };
+    console.log(`Sending email to ${to}, subject: "${subject}", via webhook`);
 
-    // Add reply_to if provided
-    if (replyTo) {
-      emailOptions.reply_to = replyTo;
-      console.log("Setting reply-to:", replyTo);
+    const webhookResponse = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to,
+        from: from || undefined,
+        subject,
+        html,
+        recipient_name: recipientName || undefined,
+        reply_to: replyTo || undefined,
+      }),
+    });
+
+    if (!webhookResponse.ok) {
+      const errText = await webhookResponse.text().catch(() => "Unknown error");
+      console.error("Webhook error:", webhookResponse.status, errText);
+      return new Response(
+        JSON.stringify({ error: `Email-Versand fehlgeschlagen: ${webhookResponse.status}`, details: errText }),
+        { status: webhookResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const emailResponse = await resend.emails.send(emailOptions);
-
-    console.log("Email sent successfully:", emailResponse);
+    const result = await webhookResponse.json().catch(() => ({}));
+    console.log("Email sent successfully via webhook");
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        messageId: emailResponse.data?.id,
-      }),
+      JSON.stringify({ success: true, ...result }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
-  } catch (error: any) {
-    console.error("Error sending email:", error);
-    
+  } catch (error) {
+    console.error("Send email error:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || "Failed to send email",
-        details: error.response?.body || null
-      }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Failed to send email" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

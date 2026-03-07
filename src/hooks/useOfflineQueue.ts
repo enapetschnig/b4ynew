@@ -9,9 +9,8 @@ export interface QueuedMessage {
     to: string;
     subject?: string;
     body: string;
-    html?: string;
+    signature?: string;
     recipientName: string;
-    senderName?: string;
     replyTo?: string;
     fromEmail?: string;
     n8nWebhookUrl?: string;
@@ -83,21 +82,21 @@ export function useOfflineQueue() {
           throw new Error('n8n Webhook-URL fehlt');
         }
 
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const response = await supabase.functions.invoke('send-email', {
+          body: {
             to: message.payload.to,
             from: message.payload.fromEmail || undefined,
             subject: message.payload.subject,
-            html: message.payload.html,
-            recipient_name: message.payload.recipientName,
-            reply_to: message.payload.replyTo || undefined,
-          }),
+            body: message.payload.body,
+            signature: message.payload.signature || undefined,
+            recipientName: message.payload.recipientName,
+            replyTo: message.payload.replyTo || undefined,
+            webhookUrl,
+          },
         });
 
-        if (!response.ok) {
-          throw new Error(`Email-Versand fehlgeschlagen: ${response.status}`);
+        if (response.error || response.data?.error) {
+          throw new Error(response.error?.message || response.data?.error);
         }
 
         await supabase.from('messages').insert({

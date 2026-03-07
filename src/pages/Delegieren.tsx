@@ -14,7 +14,6 @@ import { ProcessingScreen } from '@/components/delegation/ProcessingScreen';
 import { PreviewScreen } from '@/components/delegation/PreviewScreen';
 import { ResultScreen } from '@/components/delegation/ResultScreen';
 import { Channel, Contact, Draft, DelegationStatus, MediaFile } from '@/types/delegation';
-import { buildEmailHtml } from '@/lib/emailHtml';
 import logo from '@/assets/logo-bau4you.png';
 import { Badge } from '@/components/ui/badge';
 
@@ -35,7 +34,6 @@ export default function Delegieren() {
   const [hasWhapiToken, setHasWhapiToken] = useState(false);
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string | null>(null);
   const [smtpFromEmail, setSmtpFromEmail] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -58,7 +56,6 @@ export default function Delegieren() {
         setHasWhapiToken(!!data.whapi_token);
         if (data.n8n_webhook_url) setN8nWebhookUrl(data.n8n_webhook_url);
         if (data.smtp_from_email) setSmtpFromEmail(data.smtp_from_email);
-        if (data.display_name) setDisplayName(data.display_name);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -217,28 +214,19 @@ export default function Delegieren() {
           ? `${draft.body}\n\n${signature}`
           : draft.body;
 
-        const queueHtml = draft.channel === 'email' ? buildEmailHtml({
-          recipientName: draft.recipientName,
-          subject: draft.subject || '',
-          body: draft.body,
-          signature: signature || undefined,
-          senderName: displayName || undefined,
-        }) : undefined;
-
         addToQueue(draft.channel, {
           to: draft.recipientAddress,
           subject: draft.subject,
           body: bodyWithSignature,
-          html: queueHtml,
+          signature: signature || undefined,
           recipientName: draft.recipientName,
-          senderName: displayName || undefined,
           replyTo: replyToEmail || undefined,
           fromEmail: smtpFromEmail || undefined,
           n8nWebhookUrl: n8nWebhookUrl || undefined,
           contactId: draft.recipient?.id,
           userId: user!.id,
         });
-        
+
         toast.info('Keine Verbindung – Nachricht wird gesendet, sobald du wieder online bist');
         setStatus('sent');
         setResultMessage('Nachricht wartet auf Verbindung...');
@@ -252,35 +240,30 @@ export default function Delegieren() {
           return;
         }
 
-        const bodyWithSignature = signature
-          ? `${draft.body}\n\n${signature}`
-          : draft.body;
-
-        const html = buildEmailHtml({
-          recipientName: draft.recipientName,
-          subject: draft.subject || '',
-          body: draft.body,
-          signature: signature || undefined,
-          senderName: displayName || undefined,
-        });
-
-        const emailResponse = await fetch(n8nWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const emailResponse = await supabase.functions.invoke('send-email', {
+          body: {
             to: draft.recipientAddress,
             from: smtpFromEmail || undefined,
             subject: draft.subject,
-            html,
-            recipient_name: draft.recipientName,
-            reply_to: replyToEmail || undefined,
-          }),
+            body: draft.body,
+            signature: signature || undefined,
+            recipientName: draft.recipientName,
+            replyTo: replyToEmail || undefined,
+            webhookUrl: n8nWebhookUrl,
+          },
         });
 
-        if (!emailResponse.ok) {
-          const errText = await emailResponse.text().catch(() => 'Unbekannter Fehler');
-          throw new Error(`Email-Versand fehlgeschlagen: ${errText}`);
+        if (emailResponse.error) {
+          throw new Error(emailResponse.error.message);
         }
+
+        if (emailResponse.data?.error) {
+          throw new Error(emailResponse.data.error);
+        }
+
+        const bodyWithSignature = signature
+          ? `${draft.body}\n\n${signature}`
+          : draft.body;
 
         await supabase.from('messages').insert({
           user_id: user!.id,
@@ -365,21 +348,12 @@ export default function Delegieren() {
           ? `${draft.body}\n\n${signature}`
           : draft.body;
 
-        const queueHtml = draft.channel === 'email' ? buildEmailHtml({
-          recipientName: draft.recipientName,
-          subject: draft.subject || '',
-          body: draft.body,
-          signature: signature || undefined,
-          senderName: displayName || undefined,
-        }) : undefined;
-
         addToQueue(draft.channel, {
           to: draft.recipientAddress,
           subject: draft.subject,
           body: bodyWithSignature,
-          html: queueHtml,
+          signature: signature || undefined,
           recipientName: draft.recipientName,
-          senderName: displayName || undefined,
           replyTo: replyToEmail || undefined,
           fromEmail: smtpFromEmail || undefined,
           n8nWebhookUrl: n8nWebhookUrl || undefined,
