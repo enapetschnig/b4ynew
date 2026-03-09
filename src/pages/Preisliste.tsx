@@ -639,13 +639,21 @@ export default function Preisliste() {
                         <p className="text-xs font-medium text-foreground mb-1">Materialien:</p>
                         <div className="space-y-1">
                           {s.materials.map((m, mi) => (
-                            <div key={mi} className="flex items-center justify-between text-xs text-muted-foreground bg-secondary/30 rounded px-2 py-1">
-                              <span>{m.quantity}x {m.name} ({m.unit_type})</span>
-                              <span className="font-mono flex gap-2">
+                            <div key={mi} className="text-xs text-muted-foreground bg-secondary/30 rounded px-2 py-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {m.nr && <span className="font-mono text-[10px] text-muted-foreground/70 shrink-0">Art. {m.nr}</span>}
+                                  <span className="truncate">{m.name}</span>
+                                </div>
+                                <span className="shrink-0 ml-2">{m.quantity} {m.unit_type}</span>
+                              </div>
+                              <div className="flex justify-end gap-2 mt-0.5 font-mono">
                                 {m.base_price != null && <span>EK {m.base_price.toFixed(2)}€</span>}
                                 {m.list_price != null && <span>VK {m.list_price.toFixed(2)}€</span>}
-                                {m.base_price == null && m.list_price == null && <span>{m.net_price_per_unit?.toFixed(2)} €</span>}
-                              </span>
+                                {m.base_price == null && m.list_price == null && m.net_price_per_unit != null && (
+                                  <span>{m.net_price_per_unit.toFixed(2)} €</span>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
