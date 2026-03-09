@@ -32,23 +32,29 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
   const isSpeakingRef = useRef(false);
 
+  // Persistentes Audio-Element erstellen (einmalig)
+  if (!audioRef.current) {
+    audioRef.current = new Audio();
+  }
+
   const speakText = useCallback(async () => {
+    const audio = audioRef.current!;
+
     if (isSpeakingRef.current) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      audio.pause();
+      audio.currentTime = 0;
       isSpeakingRef.current = false;
       setIsSpeaking(false);
       return;
     }
 
-    // Sofort ein stilles Audio abspielen um Autoplay zu entsperren (User-Gesture)
-    const silentAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-    try { await silentAudio.play(); } catch (_) { /* ignore */ }
-    silentAudio.pause();
+    // SOFORT play() aufrufen — MUSS synchron im Click-Handler passieren!
+    // Spielt Stille ab (leere src), aber entsperrt Audio auf iOS Safari.
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+    audio.play().catch(() => {});
 
     const textToSpeak = draft.subject
       ? `Betreff: ${draft.subject}. ${draft.body}`
@@ -80,28 +86,28 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
       }
 
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
 
-      if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
+      // Alte Blob-URL freigeben
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
       }
 
-      const audio = new Audio(url);
-      audioRef.current = audio;
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
 
+      // Dasselbe Audio-Element wiederverwenden (bereits entsperrt!)
+      audio.pause();
       audio.onended = () => {
         isSpeakingRef.current = false;
         setIsSpeaking(false);
-        URL.revokeObjectURL(url);
       };
       audio.onerror = () => {
         isSpeakingRef.current = false;
         setIsSpeaking(false);
-        URL.revokeObjectURL(url);
         toast.error('Audio-Wiedergabe fehlgeschlagen');
       };
 
+      audio.src = url;
       isSpeakingRef.current = true;
       setIsSpeaking(true);
       await audio.play();
