@@ -31,25 +31,33 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
   const [editedBody, setEditedBody] = useState(draft.body);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const isSpeakingRef = useRef(false);
 
   const speakText = useCallback(async () => {
     if (isSpeakingRef.current) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current = null;
       }
       isSpeakingRef.current = false;
       setIsSpeaking(false);
       return;
     }
 
+    // SOFORT AudioContext erstellen/resumen — innerhalb User-Gesture!
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+
     const textToSpeak = draft.subject
       ? `Betreff: ${draft.subject}. ${draft.body}`
       : draft.body;
 
-    console.log(`TTS request: channel=${draft.channel}, textLength=${textToSpeak.length}, text="${textToSpeak.substring(0, 100)}..."`);
     setIsLoadingAudio(true);
 
     try {
@@ -75,32 +83,23 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
         throw new Error(`TTS fehlgeschlagen (${response.status})`);
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
 
-      if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
-      }
+      const source = audioContextRef.current!.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current!.destination);
 
-      const audio = new Audio(url);
-      audioRef.current = audio;
-
-      audio.onended = () => {
+      source.onended = () => {
         isSpeakingRef.current = false;
         setIsSpeaking(false);
-        URL.revokeObjectURL(url);
-      };
-      audio.onerror = () => {
-        isSpeakingRef.current = false;
-        setIsSpeaking(false);
-        URL.revokeObjectURL(url);
-        toast.error('Audio-Wiedergabe fehlgeschlagen');
+        sourceNodeRef.current = null;
       };
 
+      sourceNodeRef.current = source;
       isSpeakingRef.current = true;
       setIsSpeaking(true);
-      await audio.play();
+      source.start(0);
     } catch (e) {
       console.error('TTS error:', e);
       isSpeakingRef.current = false;
