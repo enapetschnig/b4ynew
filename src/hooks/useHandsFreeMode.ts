@@ -88,7 +88,6 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
   const blobUrlRef = useRef<string | null>(null);
   const shouldListenRef = useRef(false);
   const mutedRef = useRef(false);
-  // Tracks whether recognition is truly alive (not just referenced)
   const isAliveRef = useRef(false);
 
   const supported = typeof window !== 'undefined' &&
@@ -145,9 +144,7 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
   const startListening = useCallback(() => {
     if (!supported || !enabledRef.current) return;
 
-    // Don't listen during recording (the useAudioRecorder handles that)
     if (currentStatusRef.current === 'recording') return;
-    // Don't listen during processing states
     if (currentStatusRef.current === 'transcribing' || currentStatusRef.current === 'drafting' || currentStatusRef.current === 'sending') return;
 
     // If we already have an ALIVE recognition, just unmute and keep it
@@ -159,7 +156,12 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
 
     // Clean up any dead instance
     if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch { /* ignore */ }
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.abort();
+      } catch { /* ignore */ }
       recognitionRef.current = null;
     }
 
@@ -196,45 +198,23 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
       }
     };
 
+    // CRITICAL for iOS Safari: restart IMMEDIATELY in onend (no setTimeout!)
+    // Any delay breaks the user-gesture chain and iOS blocks recognition.start()
     recognition.onend = () => {
       isAliveRef.current = false;
       console.log('[HandsFree] Recognition ended, shouldListen:', shouldListenRef.current);
 
       if (shouldListenRef.current && enabledRef.current) {
-        // Try to restart the same instance
-        setTimeout(() => {
-          if (!shouldListenRef.current || !enabledRef.current) return;
-          try {
-            recognition.start();
-            isAliveRef.current = true;
-            console.log('[HandsFree] Recognition restarted');
-          } catch (e) {
-            console.warn('[HandsFree] Could not restart recognition:', e);
-            recognitionRef.current = null;
-            // Retry with a fresh instance after a longer delay
-            setTimeout(() => {
-              if (!shouldListenRef.current || !enabledRef.current) return;
-              try {
-                const fresh = new SpeechRecognitionClass();
-                fresh.continuous = true;
-                fresh.interimResults = false;
-                fresh.lang = 'de-DE';
-                fresh.onresult = recognition.onresult;
-                fresh.onend = recognition.onend;
-                fresh.onerror = recognition.onerror;
-                fresh.start();
-                recognitionRef.current = fresh;
-                isAliveRef.current = true;
-                console.log('[HandsFree] Fresh recognition started');
-              } catch {
-                console.warn('[HandsFree] Fresh restart also failed');
-                isAliveRef.current = false;
-                recognitionRef.current = null;
-                setIsListening(false);
-              }
-            }, 1000);
-          }
-        }, 300);
+        try {
+          recognition.start();
+          isAliveRef.current = true;
+          console.log('[HandsFree] Recognition restarted (immediate)');
+        } catch (e) {
+          console.warn('[HandsFree] Immediate restart failed:', e);
+          recognitionRef.current = null;
+          setIsListening(false);
+          // Will be revived by touch handler
+        }
       } else {
         recognitionRef.current = null;
         setIsListening(false);
@@ -267,11 +247,11 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
     const unmute = () => {
       setIsSpeaking(false);
       mutedRef.current = false;
-      // If recognition died during TTS, force restart
+      // If recognition died during TTS, try immediate restart
       if (enabledRef.current && shouldListenRef.current && !isAliveRef.current) {
         console.log('[HandsFree] Recognition died during TTS, restarting...');
         recognitionRef.current = null;
-        setTimeout(() => startListening(), 300);
+        startListening();
       }
     };
 
@@ -342,6 +322,27 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
 
     return () => {};
   }, [enabled, currentStatus, supported, startListening, stopListening]);
+
+  // BACKUP: Revive recognition on any user touch/click if it died
+  // iOS Safari may block programmatic restarts but allows gesture-triggered ones
+  useEffect(() => {
+    if (!enabled || !supported) return;
+
+    const reviveRecognition = () => {
+      if (shouldListenRef.current && !isAliveRef.current && !mutedRef.current) {
+        console.log('[HandsFree] Reviving recognition via user gesture');
+        recognitionRef.current = null;
+        startListening();
+      }
+    };
+
+    document.addEventListener('touchstart', reviveRecognition);
+    document.addEventListener('click', reviveRecognition);
+    return () => {
+      document.removeEventListener('touchstart', reviveRecognition);
+      document.removeEventListener('click', reviveRecognition);
+    };
+  }, [enabled, supported, startListening]);
 
   // Cleanup on unmount
   useEffect(() => {

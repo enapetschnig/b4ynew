@@ -497,14 +497,20 @@ export default function Delegieren() {
   if (status === 'sent' || status === 'error') return (
     <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
       <ResultScreen success={status === 'sent'} message={resultMessage} errorDetails={errorDetails} onRetry={() => setStatus('ready')} onNewMessage={handleReset} />
-      {autoMode && handsFree.isListening && (
+      {autoMode && (
         <div className="fixed bottom-20 left-0 right-0 flex justify-center">
-          <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-xs font-medium">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-            </span>
-            Sag „Neue Nachricht"{status === 'error' ? ' oder „Erneut versuchen"' : ''}
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium ${handsFree.isListening ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning'}`}>
+            {handsFree.isListening ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                </span>
+                Sag „Neue Nachricht"{status === 'error' ? ' oder „Erneut versuchen"' : ''}
+              </>
+            ) : (
+              <>Tippe hier um Sprachsteuerung fortzusetzen</>
+            )}
           </div>
         </div>
       )}
@@ -513,14 +519,20 @@ export default function Delegieren() {
   if (status === 'ready' && draft) return (
     <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
       <PreviewScreen draft={draft} contacts={contacts} onEdit={setDraft} onSelectContact={handleSelectContact} onSend={handleSend} onBack={() => setStatus('idle')} isSending={isSending} signature={useEmailSignature ? signature : null} whatsappSignature={useWhatsappSignature ? whatsappSignature : null} whatsappIncludeSubject={whatsappIncludeSubject} triggerReadAloud={autoMode && handsFree.lastCommand === 'read_aloud'} />
-      {autoMode && handsFree.isListening && (
+      {autoMode && (
         <div className="fixed bottom-20 left-0 right-0 flex justify-center">
-          <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-xs font-medium">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-            </span>
-            Sag „Senden", „Vorlesen" oder „Nochmal"
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium ${handsFree.isListening ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning'}`}>
+            {handsFree.isListening ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                </span>
+                Sag „Senden", „Vorlesen" oder „Nochmal"
+              </>
+            ) : (
+              <>Tippe hier um Sprachsteuerung fortzusetzen</>
+            )}
           </div>
         </div>
       )}
