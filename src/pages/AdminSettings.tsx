@@ -379,7 +379,7 @@ export default function AdminSettings() {
                 </SelectTrigger>
                 <SelectContent position="popper" sideOffset={4} className="z-[9999]">
                   <SelectItem value="gemini">Gemini (Google)</SelectItem>
-                  <SelectItem value="openai">GPT-4o (OpenAI)</SelectItem>
+                  <SelectItem value="openai">GPT-5.2 (OpenAI)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">

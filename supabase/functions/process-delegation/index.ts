@@ -112,7 +112,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: stri
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o",
+      model: "gpt-5.2",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -251,8 +251,20 @@ Antworte NUR im folgenden JSON-Format:
     const systemPrompt = "Du bist ein präziser Assistent für Geschäftskommunikation. Antworte immer nur mit validem JSON.";
 
     let content: string;
+    let modelUsed = preferredModel;
+
     if (preferredModel === "openai" && OPENAI_API_KEY) {
-      content = await callOpenAI(OPENAI_API_KEY, systemPrompt, parsePrompt);
+      try {
+        content = await callOpenAI(OPENAI_API_KEY, systemPrompt, parsePrompt);
+      } catch (openaiError) {
+        console.error("OpenAI failed, falling back to Gemini:", openaiError);
+        if (GEMINI_API_KEY) {
+          content = await callGemini(GEMINI_API_KEY, systemPrompt, parsePrompt);
+          modelUsed = "gemini (fallback)";
+        } else {
+          throw openaiError;
+        }
+      }
     } else if (GEMINI_API_KEY) {
       content = await callGemini(GEMINI_API_KEY, systemPrompt, parsePrompt);
     } else {
@@ -354,6 +366,7 @@ Antworte NUR im folgenden JSON-Format:
       originalTranscript: transcript,
       addressForm: finalAddressForm,
       promptSource,
+      modelUsed,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

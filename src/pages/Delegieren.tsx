@@ -154,6 +154,10 @@ export default function Delegieren() {
         throw new Error(draftData.error);
       }
 
+      if (draftData.modelUsed?.includes('fallback')) {
+        toast.info('OpenAI nicht verfügbar — Gemini wurde als Fallback verwendet');
+      }
+
       // Find matched contact from our contacts list
       const matchedContact = draftData.matchedContact 
         ? contacts.find(c => c.id === draftData.matchedContact.id) || null
