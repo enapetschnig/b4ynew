@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Draft, Channel, Contact, MediaFile } from '@/types/delegation';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { MediaPicker } from './MediaPicker';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -23,9 +23,10 @@ interface PreviewScreenProps {
   onBack: () => void;
   isSending: boolean;
   signature?: string | null;
+  triggerReadAloud?: boolean;
 }
 
-export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend, onBack, isSending, signature }: PreviewScreenProps) {
+export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend, onBack, isSending, signature, triggerReadAloud }: PreviewScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedSubject, setEditedSubject] = useState(draft.subject);
   const [editedBody, setEditedBody] = useState(draft.body);
@@ -120,6 +121,13 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
       setIsLoadingAudio(false);
     }
   }, [draft.subject, draft.body, draft.channel]);
+
+  // Auto-trigger read aloud from hands-free mode
+  useEffect(() => {
+    if (triggerReadAloud && !isSpeakingRef.current) {
+      speakText();
+    }
+  }, [triggerReadAloud, speakText]);
 
   const handleSaveEdit = () => {
     onEdit({

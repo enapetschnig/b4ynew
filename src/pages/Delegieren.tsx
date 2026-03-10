@@ -5,7 +5,8 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { LogOut, Loader2, Cloud, MessageCircle } from 'lucide-react';
+import { LogOut, Loader2, Cloud, MessageCircle, Zap } from 'lucide-react';
+import { useHandsFreeMode } from '@/hooks/useHandsFreeMode';
 import { Button } from '@/components/ui/button';
 import { ChannelToggle } from '@/components/delegation/ChannelToggle';
 import { RecordButton } from '@/components/delegation/RecordButton';
@@ -37,6 +38,8 @@ export default function Delegieren() {
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string | null>(null);
   const [smtpFromEmail, setSmtpFromEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [autoMode, setAutoMode] = useState(() => localStorage.getItem('handsfree-mode') === 'true');
+  const [autoModeAsked, setAutoModeAsked] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -392,12 +395,125 @@ export default function Delegieren() {
     setResultMessage('');
     setErrorDetails('');
     setIsSending(false);
+    setAutoModeAsked(false);
   };
+
+  // Hands-free voice command handler
+  const handleVoiceCommand = useCallback((command: string) => {
+    switch (command) {
+      case 'start_recording':
+        if (status === 'idle') handleStartRecording();
+        break;
+      case 'switch_email':
+        setChannel('email');
+        break;
+      case 'switch_whatsapp':
+        setChannel('whatsapp');
+        break;
+      case 'send':
+        if (status === 'ready' && draft) handleSend();
+        break;
+      case 'read_aloud':
+        // Will be handled by PreviewScreen
+        setAutoModeAsked(true);
+        break;
+      case 'skip_read':
+        setAutoModeAsked(true);
+        break;
+      case 'retry':
+        handleReset();
+        // Auto-start recording after reset
+        setTimeout(() => handleStartRecording(), 500);
+        break;
+      case 'reset':
+        handleReset();
+        break;
+    }
+  }, [status, draft]);
+
+  const handsFree = useHandsFreeMode({
+    enabled: autoMode,
+    currentStatus: status as 'idle' | 'recording' | 'transcribing' | 'drafting' | 'ready' | 'sending' | 'sent' | 'error',
+    onCommand: handleVoiceCommand,
+  });
+
+  // Auto-mode: ask "Soll ich vorlesen?" when draft is ready
+  useEffect(() => {
+    if (autoMode && status === 'ready' && draft && !autoModeAsked) {
+      setAutoModeAsked(true);
+      const recipientName = draft.recipientName || 'unbekannt';
+      handsFree.speak(`Nachricht an ${recipientName} erstellt. Soll ich vorlesen? Sag ja, oder sag senden.`);
+    }
+  }, [autoMode, status, draft, autoModeAsked]);
+
+  // Auto-mode: confirm send via TTS
+  useEffect(() => {
+    if (autoMode && status === 'sent') {
+      handsFree.speak('Nachricht gesendet. Sag neue Nachricht für eine weitere.');
+    }
+    if (autoMode && status === 'error') {
+      handsFree.speak('Fehler beim Senden. Sag erneut versuchen oder neue Nachricht.');
+    }
+  }, [autoMode, status]);
+
+  // Auto-mode: warn if no recipient found
+  useEffect(() => {
+    if (autoMode && status === 'ready' && draft && !draft.recipientAddress) {
+      // Delayed to not overlap with the "Soll ich vorlesen?" TTS
+      setTimeout(() => {
+        handsFree.speak('Kein Empfänger erkannt. Bitte manuell auswählen.');
+      }, 4000);
+    }
+  }, [autoMode, status, draft]);
+
+  // Toggle auto mode
+  const toggleAutoMode = useCallback(() => {
+    setAutoMode(prev => {
+      const next = !prev;
+      localStorage.setItem('handsfree-mode', String(next));
+      if (next) {
+        toast.success('Auto-Modus aktiviert — Sprachsteuerung aktiv');
+      } else {
+        toast.info('Auto-Modus deaktiviert');
+      }
+      return next;
+    });
+  }, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (status === 'sent' || status === 'error') return <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom"><ResultScreen success={status === 'sent'} message={resultMessage} errorDetails={errorDetails} onRetry={() => setStatus('ready')} onNewMessage={handleReset} /></div>;
-  if (status === 'ready' && draft) return <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom"><PreviewScreen draft={draft} contacts={contacts} onEdit={setDraft} onSelectContact={handleSelectContact} onSend={handleSend} onBack={() => setStatus('idle')} isSending={isSending} signature={signature} /></div>;
+  if (status === 'sent' || status === 'error') return (
+    <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
+      <ResultScreen success={status === 'sent'} message={resultMessage} errorDetails={errorDetails} onRetry={() => setStatus('ready')} onNewMessage={handleReset} />
+      {autoMode && handsFree.isListening && (
+        <div className="fixed bottom-20 left-0 right-0 flex justify-center">
+          <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-xs font-medium">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            </span>
+            Sag „Neue Nachricht"{status === 'error' ? ' oder „Erneut versuchen"' : ''}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+  if (status === 'ready' && draft) return (
+    <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
+      <PreviewScreen draft={draft} contacts={contacts} onEdit={setDraft} onSelectContact={handleSelectContact} onSend={handleSend} onBack={() => setStatus('idle')} isSending={isSending} signature={signature} triggerReadAloud={autoMode && handsFree.lastCommand === 'read_aloud'} />
+      {autoMode && handsFree.isListening && (
+        <div className="fixed bottom-20 left-0 right-0 flex justify-center">
+          <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-xs font-medium">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            </span>
+            Sag „Senden", „Vorlesen" oder „Nochmal"
+          </div>
+        </div>
+      )}
+    </div>
+  );
   if (status === 'transcribing' || status === 'drafting') return <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom"><ProcessingScreen status={status} /></div>;
 
   return (
@@ -413,9 +529,20 @@ export default function Delegieren() {
             </Badge>
           )}
         </div>
-        <Button variant="ghost" size="icon" onClick={signOut} className="rounded-full">
-          <LogOut className="w-5 h-5" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={autoMode ? "default" : "ghost"}
+            size="icon"
+            onClick={toggleAutoMode}
+            className={`rounded-full ${autoMode ? 'bg-primary text-primary-foreground' : ''}`}
+            title={autoMode ? 'Auto-Modus deaktivieren' : 'Auto-Modus aktivieren'}
+          >
+            <Zap className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={signOut} className="rounded-full">
+            <LogOut className="w-5 h-5" />
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
@@ -465,7 +592,26 @@ export default function Delegieren() {
               Tipp: Sag am Ende „senden" — die Aufnahme stoppt automatisch
             </p>
           )}
-          {!audioRecorder.isRecording && (
+          {!audioRecorder.isRecording && autoMode && handsFree.isListening && (
+            <div className="mt-6 flex flex-col items-center gap-2 animate-fade-up">
+              <div className="flex items-center gap-2 text-primary">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
+                </span>
+                <span className="text-xs font-medium">Sprachsteuerung aktiv</span>
+              </div>
+              <p className="text-muted-foreground text-center text-xs max-w-xs">
+                Sag „Aufnahme starten" oder „Per WhatsApp" / „Per E-Mail"
+              </p>
+              {handsFree.lastCommand && (
+                <p className="text-xs text-primary font-medium animate-fade-up">
+                  Erkannt: {handsFree.lastCommand}
+                </p>
+              )}
+            </div>
+          )}
+          {!audioRecorder.isRecording && !autoMode && (
             <p className="mt-6 text-muted-foreground text-center text-sm max-w-xs">
               Sag z.B.: „An Christoph: Bitte den Bericht bis Freitag fertigstellen…"
             </p>
