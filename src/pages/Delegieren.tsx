@@ -460,6 +460,11 @@ export default function Delegieren() {
               disabled={channel === 'whatsapp' && !hasWhapiToken}
             />
           </div>
+          {audioRecorder.isRecording && (
+            <p className="mt-4 text-muted-foreground text-center text-xs max-w-xs animate-fade-up">
+              Tipp: Sag am Ende „senden" — die Aufnahme stoppt automatisch
+            </p>
+          )}
           {!audioRecorder.isRecording && (
             <p className="mt-6 text-muted-foreground text-center text-sm max-w-xs">
               Sag z.B.: „An Christoph: Bitte den Bericht bis Freitag fertigstellen…"
