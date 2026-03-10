@@ -192,45 +192,80 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
     }
   }, [supported, matchCommand, stopListening]);
 
-  // TTS speak function
+  // TTS speak function — uses ElevenLabs for natural voice, falls back to browser TTS
   const speak = useCallback(async (text: string): Promise<void> => {
-    // First try browser SpeechSynthesis for quick responses (no server call needed)
-    if ('speechSynthesis' in window) {
-      return new Promise<void>((resolve) => {
-        // Pause listening while speaking to avoid picking up our own voice
-        stopListening();
+    stopListening();
+    setIsSpeaking(true);
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'de-DE';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
+    try {
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
 
-        // Try to find a German voice
-        const voices = window.speechSynthesis.getVoices();
-        const germanVoice = voices.find(v => v.lang.startsWith('de'));
-        if (germanVoice) utterance.voice = germanVoice;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ text }),
+        }
+      );
 
-        setIsSpeaking(true);
+      if (!response.ok) throw new Error('TTS failed');
 
-        utterance.onend = () => {
+      const blob = await response.blob();
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+
+      const audio = audioRef.current!;
+      audio.src = url;
+
+      await new Promise<void>((resolve) => {
+        audio.onended = () => {
           setIsSpeaking(false);
-          // Resume listening after speaking
-          if (enabledRef.current) {
-            setTimeout(() => startListening(), 500);
-          }
+          if (enabledRef.current) setTimeout(() => startListening(), 500);
           resolve();
         };
-
-        utterance.onerror = () => {
+        audio.onerror = () => {
           setIsSpeaking(false);
-          if (enabledRef.current) {
-            setTimeout(() => startListening(), 500);
-          }
+          if (enabledRef.current) setTimeout(() => startListening(), 500);
           resolve();
         };
-
-        window.speechSynthesis.speak(utterance);
+        audio.play().catch(() => {
+          setIsSpeaking(false);
+          if (enabledRef.current) setTimeout(() => startListening(), 500);
+          resolve();
+        });
       });
+    } catch {
+      // Fallback: Browser SpeechSynthesis
+      if ('speechSynthesis' in window) {
+        await new Promise<void>((resolve) => {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'de-DE';
+          const voices = window.speechSynthesis.getVoices();
+          const germanVoice = voices.find(v => v.lang.startsWith('de'));
+          if (germanVoice) utterance.voice = germanVoice;
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            if (enabledRef.current) setTimeout(() => startListening(), 500);
+            resolve();
+          };
+          utterance.onerror = () => {
+            setIsSpeaking(false);
+            if (enabledRef.current) setTimeout(() => startListening(), 500);
+            resolve();
+          };
+          window.speechSynthesis.speak(utterance);
+        });
+      } else {
+        setIsSpeaking(false);
+        if (enabledRef.current) setTimeout(() => startListening(), 500);
+      }
     }
   }, [stopListening, startListening]);
 

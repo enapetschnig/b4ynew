@@ -5,8 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ElevenLabs "Daniel" - angenehme deutsche Stimme (multilingual_v2)
-const VOICE_ID = "onwK4e9ZLuTAKqWW03F9";
+// ElevenLabs "Aria" - natürliche weibliche Stimme (multilingual_v2)
+const VOICE_ID = "9BWtsMINqrJLrRacOk9x";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
