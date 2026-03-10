@@ -155,7 +155,7 @@ export default function Delegieren() {
       }
 
       if (draftData.modelUsed?.includes('fallback')) {
-        toast.info('OpenAI nicht verfügbar — Gemini wurde als Fallback verwendet');
+        toast.info(`OpenAI-Fehler: ${draftData.fallbackReason || 'unbekannt'} — Gemini wurde verwendet`);
       }
 
       // Find matched contact from our contacts list

@@ -252,12 +252,15 @@ Antworte NUR im folgenden JSON-Format:
 
     let content: string;
     let modelUsed = preferredModel;
+    let fallbackReason = "";
 
     if (preferredModel === "openai" && OPENAI_API_KEY) {
       try {
         content = await callOpenAI(OPENAI_API_KEY, systemPrompt, parsePrompt);
       } catch (openaiError) {
-        console.error("OpenAI failed, falling back to Gemini:", openaiError);
+        const errorMsg = openaiError instanceof Error ? openaiError.message : String(openaiError);
+        console.error("OpenAI failed, falling back to Gemini:", errorMsg);
+        fallbackReason = errorMsg;
         if (GEMINI_API_KEY) {
           content = await callGemini(GEMINI_API_KEY, systemPrompt, parsePrompt);
           modelUsed = "gemini (fallback)";
@@ -367,6 +370,7 @@ Antworte NUR im folgenden JSON-Format:
       addressForm: finalAddressForm,
       promptSource,
       modelUsed,
+      fallbackReason,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
