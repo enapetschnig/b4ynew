@@ -3,7 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Save, Mail, FileText, ChevronRight, Cpu, Smartphone, MessageCircle, Eye, EyeOff, Webhook, CheckCircle2, XCircle, Lock } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Mail, FileText, ChevronRight, Cpu, Smartphone, MessageCircle, Eye, EyeOff, Webhook, CheckCircle2, XCircle, Lock, Settings2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,10 @@ interface Profile {
   whapi_token: string | null;
   n8n_webhook_url: string | null;
   smtp_from_email: string | null;
+  whatsapp_signature: string | null;
+  use_email_signature: boolean;
+  use_whatsapp_signature: boolean;
+  whatsapp_include_subject: boolean;
 }
 
 export default function AdminSettings() {
@@ -43,6 +48,10 @@ export default function AdminSettings() {
     whapi_token: '',
     n8n_webhook_url: '',
     smtp_from_email: '',
+    whatsapp_signature: '',
+    use_email_signature: true,
+    use_whatsapp_signature: true,
+    whatsapp_include_subject: false,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +69,7 @@ export default function AdminSettings() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('display_name, signature, reply_to_email, default_channel, preferred_model, whapi_token, n8n_webhook_url, smtp_from_email')
+        .select('display_name, signature, reply_to_email, default_channel, preferred_model, whapi_token, n8n_webhook_url, smtp_from_email, whatsapp_signature, use_email_signature, use_whatsapp_signature, whatsapp_include_subject')
         .eq('user_id', user!.id)
         .maybeSingle();
 
@@ -74,6 +83,10 @@ export default function AdminSettings() {
           whapi_token: data.whapi_token || '',
           n8n_webhook_url: data.n8n_webhook_url || '',
           smtp_from_email: data.smtp_from_email || '',
+          whatsapp_signature: data.whatsapp_signature || '',
+          use_email_signature: data.use_email_signature !== false,
+          use_whatsapp_signature: data.use_whatsapp_signature !== false,
+          whatsapp_include_subject: data.whatsapp_include_subject === true,
         });
       }
     } catch (err) {
@@ -99,6 +112,10 @@ export default function AdminSettings() {
           whapi_token: profile.whapi_token || null,
           n8n_webhook_url: profile.n8n_webhook_url || null,
           smtp_from_email: profile.smtp_from_email || null,
+          whatsapp_signature: profile.whatsapp_signature || null,
+          use_email_signature: profile.use_email_signature,
+          use_whatsapp_signature: profile.use_whatsapp_signature,
+          whatsapp_include_subject: profile.whatsapp_include_subject,
         })
         .eq('user_id', user.id);
 
@@ -183,7 +200,7 @@ export default function AdminSettings() {
         <Card>
           <CardHeader>
             <CardTitle>Profil</CardTitle>
-            <CardDescription>Dein Name und Signatur für E-Mails</CardDescription>
+            <CardDescription>Dein Name für den E-Mail-Versand</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -198,15 +215,93 @@ export default function AdminSettings() {
                 Wird als Absendername in E-Mails verwendet
               </p>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="signature">Signatur</Label>
-              <Textarea
-                id="signature"
-                placeholder="Mit freundlichen Grüßen,&#10;Max Mustermann"
-                value={profile.signature || ''}
-                onChange={(e) => setProfile({ ...profile, signature: e.target.value })}
-                rows={3}
+          </CardContent>
+        </Card>
+
+        {/* Message Settings Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-primary" />
+              <CardTitle>Nachrichteneinstellungen</CardTitle>
+            </div>
+            <CardDescription>Signaturen und Betreff-Optionen für E-Mail und WhatsApp</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* E-Mail Signatur */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="use_email_signature" className="font-medium">E-Mail-Signatur verwenden</Label>
+                </div>
+                <Switch
+                  id="use_email_signature"
+                  checked={profile.use_email_signature}
+                  onCheckedChange={(checked) => setProfile({ ...profile, use_email_signature: checked })}
+                />
+              </div>
+              {profile.use_email_signature && (
+                <div className="space-y-2 pl-6">
+                  <Textarea
+                    id="signature"
+                    placeholder="Mit freundlichen Grüßen,&#10;Max Mustermann"
+                    value={profile.signature || ''}
+                    onChange={(e) => setProfile({ ...profile, signature: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border/50" />
+
+            {/* WhatsApp Signatur */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-green-500" />
+                  <Label htmlFor="use_whatsapp_signature" className="font-medium">WhatsApp-Signatur verwenden</Label>
+                </div>
+                <Switch
+                  id="use_whatsapp_signature"
+                  checked={profile.use_whatsapp_signature}
+                  onCheckedChange={(checked) => setProfile({ ...profile, use_whatsapp_signature: checked })}
+                />
+              </div>
+              {profile.use_whatsapp_signature && (
+                <div className="space-y-2 pl-6">
+                  <Textarea
+                    id="whatsapp_signature"
+                    placeholder="Liebe Grüße,&#10;Max"
+                    value={profile.whatsapp_signature || ''}
+                    onChange={(e) => setProfile({ ...profile, whatsapp_signature: e.target.value })}
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Wird am Ende jeder WhatsApp-Nachricht angefügt
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border/50" />
+
+            {/* WhatsApp Betreff */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <Label htmlFor="whatsapp_include_subject" className="font-medium">Betreff bei WhatsApp</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Betreff-Zeile vor WhatsApp-Nachrichten einfügen
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="whatsapp_include_subject"
+                checked={profile.whatsapp_include_subject}
+                onCheckedChange={(checked) => setProfile({ ...profile, whatsapp_include_subject: checked })}
               />
             </div>
           </CardContent>

@@ -23,10 +23,12 @@ interface PreviewScreenProps {
   onBack: () => void;
   isSending: boolean;
   signature?: string | null;
+  whatsappSignature?: string | null;
+  whatsappIncludeSubject?: boolean;
   triggerReadAloud?: boolean;
 }
 
-export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend, onBack, isSending, signature, triggerReadAloud }: PreviewScreenProps) {
+export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend, onBack, isSending, signature, whatsappSignature, whatsappIncludeSubject, triggerReadAloud }: PreviewScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedSubject, setEditedSubject] = useState(draft.subject);
   const [editedBody, setEditedBody] = useState(draft.body);
@@ -266,7 +268,7 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
 
         {/* Message Content */}
         <div className="space-y-4">
-          {(draft.channel === 'email' || draft.channel === 'whatsapp') && (
+          {(draft.channel === 'email' || (draft.channel === 'whatsapp' && whatsappIncludeSubject)) && (
             <div>
               <p className="text-sm text-muted-foreground mb-2">Betreff</p>
               {isEditing ? (
@@ -304,6 +306,13 @@ export function PreviewScreen({ draft, contacts, onEdit, onSelectContact, onSend
               <div className="mt-4 pt-4 border-t border-border/30">
                 <p className="text-xs text-muted-foreground mb-1">Signatur</p>
                 <p className="text-muted-foreground whitespace-pre-wrap text-sm">{signature}</p>
+              </div>
+            )}
+            {/* WhatsApp Signature Display */}
+            {draft.channel === 'whatsapp' && whatsappSignature && !isEditing && (
+              <div className="mt-4 pt-4 border-t border-border/30">
+                <p className="text-xs text-muted-foreground mb-1">WhatsApp-Signatur</p>
+                <p className="text-muted-foreground whitespace-pre-wrap text-sm">{whatsappSignature}</p>
               </div>
             )}
           </div>

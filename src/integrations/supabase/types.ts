@@ -189,8 +189,12 @@ export type Database = {
           signature: string | null
           smtp_from_email: string | null
           updated_at: string
+          use_email_signature: boolean | null
+          use_whatsapp_signature: boolean | null
           user_id: string
           whapi_token: string | null
+          whatsapp_include_subject: boolean | null
+          whatsapp_signature: string | null
         }
         Insert: {
           anleitung_completed?: boolean | null
@@ -205,8 +209,12 @@ export type Database = {
           signature?: string | null
           smtp_from_email?: string | null
           updated_at?: string
+          use_email_signature?: boolean | null
+          use_whatsapp_signature?: boolean | null
           user_id: string
           whapi_token?: string | null
+          whatsapp_include_subject?: boolean | null
+          whatsapp_signature?: string | null
         }
         Update: {
           anleitung_completed?: boolean | null
@@ -221,8 +229,12 @@ export type Database = {
           signature?: string | null
           smtp_from_email?: string | null
           updated_at?: string
+          use_email_signature?: boolean | null
+          use_whatsapp_signature?: boolean | null
           user_id?: string
           whapi_token?: string | null
+          whatsapp_include_subject?: boolean | null
+          whatsapp_signature?: string | null
         }
         Relationships: []
       }

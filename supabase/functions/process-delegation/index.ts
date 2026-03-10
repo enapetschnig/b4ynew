@@ -147,6 +147,9 @@ serve(async (req) => {
     let userPrompt = isWhatsApp ? DEFAULT_WHATSAPP_PROMPT : DEFAULT_EMAIL_PROMPT;
     let preferredModel = "gemini";
     let promptSource = "default";
+    let whatsappIncludeSubject = false;
+    let useWhatsappSignature = true;
+    let whatsappSignature: string | null = null;
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader && SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -178,15 +181,24 @@ serve(async (req) => {
           console.log("Using default prompt");
         }
 
-        // Load user's preferred model
+        // Load user's preferred model and message settings
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("preferred_model")
+          .select("preferred_model, use_whatsapp_signature, whatsapp_include_subject, whatsapp_signature")
           .eq("user_id", userId)
           .maybeSingle();
 
         if (profileData?.preferred_model) {
           preferredModel = profileData.preferred_model;
+        }
+        if (profileData?.whatsapp_include_subject !== null && profileData?.whatsapp_include_subject !== undefined) {
+          whatsappIncludeSubject = profileData.whatsapp_include_subject;
+        }
+        if (profileData?.use_whatsapp_signature !== null && profileData?.use_whatsapp_signature !== undefined) {
+          useWhatsappSignature = profileData.use_whatsapp_signature;
+        }
+        if (profileData?.whatsapp_signature) {
+          whatsappSignature = profileData.whatsapp_signature;
         }
       }
     }
@@ -236,14 +248,16 @@ Aufgaben:
 2. Entferne die Empfänger-Nennung aus dem eigentlichen Nachrichteninhalt
 3. Bestimme die Anredeform: Wenn der gematchte Kontakt [Du-Form] oder [Sie-Form] hat, verwende DIESE Form verbindlich für Anrede, Text und Abschluss. Sonst: Explizit im Transkript angegeben > Default Sie-Form
 4. Erstelle den Nachrichtentext gemäß den obigen Anweisungen
-5. Erstelle IMMER einen kurzen, prägnanten Betreff der den Inhalt zusammenfasst
+${channel === 'whatsapp' && !whatsappIncludeSubject ? '5. Erstelle KEINEN Betreff für WhatsApp-Nachrichten. Das subject-Feld soll leer sein.' : '5. Erstelle IMMER einen kurzen, prägnanten Betreff der den Inhalt zusammenfasst'}
+${channel === 'whatsapp' && useWhatsappSignature && whatsappSignature ? `6. Verwende exakt diese Signatur als Abschluss der Nachricht (NICHT verändern): "${whatsappSignature}"` : ''}
+${channel === 'whatsapp' && !useWhatsappSignature ? '6. Füge KEINEN Abschlussgruß oder Signatur ein. Die Nachricht endet nach dem inhaltlichen Text.' : ''}
 
 Antworte NUR im folgenden JSON-Format:
 {
   "detectedRecipient": "Name aus Transkript",
   "matchedContact": "Vollständiger Name aus Kontaktliste oder null",
   "addressForm": "du" oder "sie",
-  "subject": "PFLICHTFELD - Betreff der den Inhalt zusammenfasst",
+  "subject": "${channel === 'whatsapp' && !whatsappIncludeSubject ? 'Leer lassen für WhatsApp' : 'PFLICHTFELD - Betreff der den Inhalt zusammenfasst'}",
   "body": "Vollständiger Nachrichtentext",
   "summary": "Kurze Zusammenfassung in 1-2 Sätzen"
 }`;

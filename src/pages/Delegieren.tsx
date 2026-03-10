@@ -38,6 +38,10 @@ export default function Delegieren() {
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string | null>(null);
   const [smtpFromEmail, setSmtpFromEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [whatsappSignature, setWhatsappSignature] = useState<string | null>(null);
+  const [useEmailSignature, setUseEmailSignature] = useState(true);
+  const [useWhatsappSignature, setUseWhatsappSignature] = useState(true);
+  const [whatsappIncludeSubject, setWhatsappIncludeSubject] = useState(false);
   const [autoMode, setAutoMode] = useState(() => localStorage.getItem('handsfree-mode') === 'true');
   const [autoModeAsked, setAutoModeAsked] = useState(false);
 
@@ -52,7 +56,7 @@ export default function Delegieren() {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('reply_to_email, signature, whapi_token, n8n_webhook_url, smtp_from_email, display_name')
+        .select('reply_to_email, signature, whapi_token, n8n_webhook_url, smtp_from_email, display_name, whatsapp_signature, use_email_signature, use_whatsapp_signature, whatsapp_include_subject')
         .eq('user_id', user!.id)
         .maybeSingle();
 
@@ -63,6 +67,10 @@ export default function Delegieren() {
         if (data.n8n_webhook_url) setN8nWebhookUrl(data.n8n_webhook_url);
         if (data.smtp_from_email) setSmtpFromEmail(data.smtp_from_email);
         if (data.display_name) setDisplayName(data.display_name);
+        if (data.whatsapp_signature) setWhatsappSignature(data.whatsapp_signature);
+        setUseEmailSignature(data.use_email_signature !== false);
+        setUseWhatsappSignature(data.use_whatsapp_signature !== false);
+        setWhatsappIncludeSubject(data.whatsapp_include_subject === true);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -224,7 +232,7 @@ export default function Delegieren() {
       // Check if online before attempting to send
       if (!navigator.onLine) {
         // Queue the message for later
-        const bodyWithSignature = (draft.channel === 'email' && signature)
+        const bodyWithSignature = (draft.channel === 'email' && useEmailSignature && signature)
           ? `${draft.body}\n\n${signature}`
           : draft.body;
 
@@ -260,7 +268,7 @@ export default function Delegieren() {
             from: smtpFromEmail || undefined,
             subject: draft.subject,
             body: draft.body,
-            signature: signature || undefined,
+            signature: useEmailSignature && signature ? signature : undefined,
             recipientName: draft.recipientName,
             senderName: displayName || undefined,
             replyTo: replyToEmail || undefined,
@@ -276,7 +284,7 @@ export default function Delegieren() {
           throw new Error(emailResponse.data.error);
         }
 
-        const bodyWithSignature = signature
+        const bodyWithSignature = useEmailSignature && signature
           ? `${draft.body}\n\n${signature}`
           : draft.body;
 
@@ -330,7 +338,11 @@ export default function Delegieren() {
         const whatsappResponse = await supabase.functions.invoke('send-whatsapp', {
           body: {
             to: draft.recipientAddress,
-            body: draft.subject ? `Betreff: ${draft.subject}\n\n${draft.body}` : draft.body,
+            body: [
+              whatsappIncludeSubject && draft.subject ? `Betreff: ${draft.subject}` : null,
+              draft.body,
+              useWhatsappSignature && whatsappSignature ? whatsappSignature : null,
+            ].filter(Boolean).join('\n\n'),
             recipientName: draft.recipientName,
             contactId: draft.recipient?.id,
             mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
@@ -359,7 +371,7 @@ export default function Delegieren() {
       
       // If network error, add to offline queue
       if (!navigator.onLine || (error instanceof Error && error.message.toLowerCase().includes('network'))) {
-        const bodyWithSignature = (draft.channel === 'email' && signature)
+        const bodyWithSignature = (draft.channel === 'email' && useEmailSignature && signature)
           ? `${draft.body}\n\n${signature}`
           : draft.body;
 
@@ -500,7 +512,7 @@ export default function Delegieren() {
   );
   if (status === 'ready' && draft) return (
     <div className="min-h-screen flex flex-col bg-background safe-area-top safe-area-bottom">
-      <PreviewScreen draft={draft} contacts={contacts} onEdit={setDraft} onSelectContact={handleSelectContact} onSend={handleSend} onBack={() => setStatus('idle')} isSending={isSending} signature={signature} triggerReadAloud={autoMode && handsFree.lastCommand === 'read_aloud'} />
+      <PreviewScreen draft={draft} contacts={contacts} onEdit={setDraft} onSelectContact={handleSelectContact} onSend={handleSend} onBack={() => setStatus('idle')} isSending={isSending} signature={useEmailSignature ? signature : null} whatsappSignature={useWhatsappSignature ? whatsappSignature : null} whatsappIncludeSubject={whatsappIncludeSubject} triggerReadAloud={autoMode && handsFree.lastCommand === 'read_aloud'} />
       {autoMode && handsFree.isListening && (
         <div className="fixed bottom-20 left-0 right-0 flex justify-center">
           <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-xs font-medium">
