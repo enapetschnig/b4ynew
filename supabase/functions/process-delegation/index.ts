@@ -112,7 +112,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: stri
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-5.2",
+      model: "gpt-5.1",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
