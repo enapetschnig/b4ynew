@@ -112,7 +112,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: stri
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -123,7 +123,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: stri
   if (!response.ok) {
     const errorText = await response.text();
     console.error("OpenAI API error:", response.status, errorText);
-    throw new Error(`OpenAI API error: ${response.status}`);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
   }
   const data = await response.json();
   return data.choices?.[0]?.message?.content || "";

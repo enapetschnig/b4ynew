@@ -4,8 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
-  Loader2, ArrowLeft, Save, RotateCcw, Check, 
-  FileText, History, ChevronDown, Mail, MessageCircle
+  Loader2, ArrowLeft, Save, RotateCcw, Check,
+  FileText, History, ChevronDown, Mail, MessageCircle, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -84,6 +84,16 @@ export default function AdminPrompts() {
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailHistory, setShowEmailHistory] = useState(false);
   const [showWhatsappHistory, setShowWhatsappHistory] = useState(false);
+  const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
+
+  const toggleVersion = (id: string) => {
+    setExpandedVersions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Helpers for current channel
   const prompts = activeTab === 'email' ? emailPrompts : whatsappPrompts;
@@ -359,42 +369,65 @@ export default function AdminPrompts() {
                   {prompts.map((prompt) => (
                     <div
                       key={prompt.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        prompt.is_active 
-                          ? 'border-primary/50 bg-primary/5' 
+                      className={`rounded-lg border ${
+                        prompt.is_active
+                          ? 'border-primary/50 bg-primary/5'
                           : 'border-border/50'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Version {prompt.version}</span>
+                            {prompt.is_active && (
+                              <Badge variant="default" className="text-xs">
+                                <Check className="w-3 h-3 mr-1" />
+                                Aktiv
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(prompt.created_at).toLocaleDateString('de-DE', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">Version {prompt.version}</span>
-                          {prompt.is_active && (
-                            <Badge variant="default" className="text-xs">
-                              <Check className="w-3 h-3 mr-1" />
-                              Aktiv
-                            </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleVersion(prompt.id)}
+                          >
+                            {expandedVersions.has(prompt.id) ? (
+                              <EyeOff className="w-4 h-4 mr-1" />
+                            ) : (
+                              <Eye className="w-4 h-4 mr-1" />
+                            )}
+                            {expandedVersions.has(prompt.id) ? 'Verbergen' : 'Anzeigen'}
+                          </Button>
+                          {!prompt.is_active && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRollback(prompt)}
+                              disabled={isSaving}
+                            >
+                              <RotateCcw className="w-4 h-4 mr-2" />
+                              Wiederherstellen
+                            </Button>
                           )}
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(prompt.created_at).toLocaleDateString('de-DE', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
                       </div>
-                      {!prompt.is_active && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRollback(prompt)}
-                          disabled={isSaving}
-                        >
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Wiederherstellen
-                        </Button>
+                      {expandedVersions.has(prompt.id) && (
+                        <div className="px-3 pb-3">
+                          <pre className="text-xs font-mono bg-secondary/50 rounded-lg p-3 whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                            {prompt.content}
+                          </pre>
+                        </div>
                       )}
                     </div>
                   ))}

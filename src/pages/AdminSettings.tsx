@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Save, Mail, FileText, ChevronRight, Cpu, Smartphone, MessageCircle, Eye, EyeOff, Webhook, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Mail, FileText, ChevronRight, Cpu, Smartphone, MessageCircle, Eye, EyeOff, Webhook, CheckCircle2, XCircle, Lock } from 'lucide-react';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,10 @@ export default function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showWhapiToken, setShowWhapiToken] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   useEffect(() => {
     if (user) loadProfile();
@@ -110,6 +114,33 @@ export default function AdminSettings() {
     }
     
     setIsSaving(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error('Passwort muss mindestens 6 Zeichen haben');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwörter stimmen nicht überein');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        toast.error(error.message || 'Passwort ändern fehlgeschlagen');
+      } else {
+        toast.success('Passwort erfolgreich geändert');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (err) {
+      console.error('Password change failed:', err);
+      toast.error('Fehler beim Passwort ändern');
+    }
+    setIsChangingPassword(false);
   };
 
   if (loading || isLoading) {
@@ -178,6 +209,68 @@ export default function AdminSettings() {
                 rows={3}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Password Change Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" />
+              <CardTitle>Passwort ändern</CardTitle>
+            </div>
+            <CardDescription>Ändere dein Anmelde-Passwort</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new_password">Neues Passwort</Label>
+              <div className="relative">
+                <Input
+                  id="new_password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  placeholder="Mindestens 6 Zeichen"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm_password">Passwort bestätigen</Label>
+              <Input
+                id="confirm_password"
+                type="password"
+                placeholder="Passwort wiederholen"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword || !newPassword || !confirmPassword}
+              size="sm"
+              variant="outline"
+            >
+              {isChangingPassword ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Lock className="w-4 h-4 mr-2" />
+              )}
+              Passwort ändern
+            </Button>
           </CardContent>
         </Card>
 
@@ -286,7 +379,7 @@ export default function AdminSettings() {
                 </SelectTrigger>
                 <SelectContent position="popper" sideOffset={4} className="z-[9999]">
                   <SelectItem value="gemini">Gemini (Google)</SelectItem>
-                  <SelectItem value="openai">GPT-5 (OpenAI)</SelectItem>
+                  <SelectItem value="openai">GPT-4o (OpenAI)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
