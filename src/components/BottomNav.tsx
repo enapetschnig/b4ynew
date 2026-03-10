@@ -4,7 +4,7 @@ import { Send, FileSpreadsheet, FileText, Settings } from 'lucide-react';
 const tabs = [
   { label: 'Delegieren', icon: Send, path: '/delegieren' },
   { label: 'Preisliste', icon: FileSpreadsheet, path: '/preisliste' },
-  { label: 'Angebote', icon: FileText, path: '/angebote', disabled: true },
+  { label: 'Angebote', icon: FileText, path: '/angebote' },
   { label: 'Admin', icon: Settings, path: '/admin' },
 ] as const;
 
