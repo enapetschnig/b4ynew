@@ -96,9 +96,19 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
   useEffect(() => { currentStatusRef.current = currentStatus; }, [currentStatus]);
   useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
-  // Persistent audio element
+  // Persistent audio element — create once and unlock for iOS autoplay
   if (!audioRef.current && typeof window !== 'undefined') {
-    audioRef.current = new Audio();
+    const audio = new Audio();
+    // Unlock iOS audio by playing silent data on first user interaction
+    const unlockAudio = () => {
+      audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+      audio.play().catch(() => {});
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    };
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+    audioRef.current = audio;
   }
 
   const matchCommand = useCallback((transcript: string): string | null => {
@@ -241,7 +251,8 @@ export function useHandsFreeMode({ enabled, currentStatus, onCommand }: UseHands
           resolve();
         });
       });
-    } catch {
+    } catch (err) {
+      console.error('[HandsFree] ElevenLabs TTS failed, falling back to browser:', err);
       // Fallback: Browser SpeechSynthesis
       if ('speechSynthesis' in window) {
         await new Promise<void>((resolve) => {
