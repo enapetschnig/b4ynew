@@ -1,4 +1,52 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+
+// Web Speech API type declarations
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition: new () => SpeechRecognitionInstance;
+  }
+}
+
+interface UseAudioRecorderOptions {
+  autoSendTrigger?: string; // Trigger word, default: "senden"
+  onAutoSend?: () => void;  // Called when trigger word is detected
+}
 
 interface UseAudioRecorderResult {
   isRecording: boolean;
@@ -10,9 +58,18 @@ interface UseAudioRecorderResult {
   pauseRecording: () => void;
   resumeRecording: () => void;
   error: string | null;
+  autoSendSupported: boolean;
 }
 
-export function useAudioRecorder(): UseAudioRecorderResult {
+export function useAudioRecorder(options?: UseAudioRecorderOptions): UseAudioRecorderResult {
+  const triggerWord = (options?.autoSendTrigger || 'senden').toLowerCase();
+  const onAutoSendRef = useRef(options?.onAutoSend);
+
+  // Keep the callback ref up to date
+  useEffect(() => {
+    onAutoSendRef.current = options?.onAutoSend;
+  }, [options?.onAutoSend]);
+
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -23,6 +80,12 @@ export function useAudioRecorder(): UseAudioRecorderResult {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const autoSendTriggeredRef = useRef(false);
+
+  // Check if SpeechRecognition is supported
+  const autoSendSupported = typeof window !== 'undefined' &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const startTimer = useCallback(() => {
     timerRef.current = window.setInterval(() => {
@@ -36,6 +99,78 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       timerRef.current = null;
     }
   }, []);
+
+  const stopSpeechRecognition = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.abort();
+      } catch {
+        // Ignore errors during cleanup
+      }
+      recognitionRef.current = null;
+    }
+  }, []);
+
+  const startSpeechRecognition = useCallback(() => {
+    if (!autoSendSupported || !onAutoSendRef.current) return;
+
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognitionClass();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'de-DE';
+
+    autoSendTriggeredRef.current = false;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      if (autoSendTriggeredRef.current) return;
+
+      // Check the latest result
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0].transcript.trim().toLowerCase();
+
+        // Check if the transcript ends with the trigger word
+        if (transcript.endsWith(triggerWord) && result.isFinal) {
+          autoSendTriggeredRef.current = true;
+          console.log(`Auto-send triggered by "${triggerWord}"`);
+          // Small delay to ensure audio data is captured
+          setTimeout(() => {
+            onAutoSendRef.current?.();
+          }, 300);
+          return;
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      // Restart if still recording and not triggered
+      if (!autoSendTriggeredRef.current && mediaRecorderRef.current?.state === 'recording') {
+        try {
+          recognition.start();
+        } catch {
+          // Ignore restart errors
+        }
+      }
+    };
+
+    recognition.onerror = (event: { error: string }) => {
+      // Don't log "aborted" or "no-speech" errors
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        console.warn('SpeechRecognition error:', event.error);
+      }
+    };
+
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch {
+      console.warn('Could not start SpeechRecognition');
+    }
+  }, [autoSendSupported, triggerWord]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -75,33 +210,39 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       setIsPaused(false);
       startTimer();
 
+      // Start speech recognition for auto-send detection
+      startSpeechRecognition();
+
     } catch (err) {
       console.error('Error starting recording:', err);
       setError('Mikrofonzugriff verweigert. Bitte erlauben Sie den Zugriff.');
     }
-  }, [startTimer]);
+  }, [startTimer, startSpeechRecognition]);
 
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    // Stop speech recognition
+    stopSpeechRecognition();
+
     return new Promise((resolve) => {
       const mediaRecorder = mediaRecorderRef.current;
-      
+
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
         resolve(null);
         return;
       }
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { 
-          type: mediaRecorder.mimeType || 'audio/webm' 
+        const blob = new Blob(chunksRef.current, {
+          type: mediaRecorder.mimeType || 'audio/webm'
         });
         setAudioBlob(blob);
-        
+
         // Stop all tracks
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
-        
+
         setIsRecording(false);
         setIsPaused(false);
         stopTimer();
@@ -110,7 +251,7 @@ export function useAudioRecorder(): UseAudioRecorderResult {
 
       mediaRecorder.stop();
     });
-  }, [stopTimer]);
+  }, [stopTimer, stopSpeechRecognition]);
 
   const pauseRecording = useCallback(() => {
     const mediaRecorder = mediaRecorderRef.current;
@@ -140,5 +281,6 @@ export function useAudioRecorder(): UseAudioRecorderResult {
     pauseRecording,
     resumeRecording,
     error,
+    autoSendSupported,
   };
 }

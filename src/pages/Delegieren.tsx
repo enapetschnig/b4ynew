@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -20,7 +20,9 @@ import { Badge } from '@/components/ui/badge';
 export default function Delegieren() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
-  const audioRecorder = useAudioRecorder();
+  const autoSendRef = useRef<() => void>();
+  const handleAutoSend = useCallback(() => autoSendRef.current?.(), []);
+  const audioRecorder = useAudioRecorder({ onAutoSend: handleAutoSend });
   const { queue, queueLength, addToQueue, processQueue, isProcessing } = useOfflineQueue();
   const [channel, setChannel] = useState<Channel>('email');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -185,6 +187,9 @@ export default function Delegieren() {
       setResultMessage('Fehler bei der Verarbeitung');
     }
   };
+
+  // Wire up auto-send to trigger handleStopRecording
+  autoSendRef.current = handleStopRecording;
 
   const handleSelectContact = (contact: Contact) => {
     if (!draft) return;

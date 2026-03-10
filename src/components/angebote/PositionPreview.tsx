@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, Check, Calculator, Clock, Package } from 'lucide-react';
+import { ChevronDown, ChevronRight, Calculator, Clock, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+
 
 export interface Position {
   menge: number;
@@ -43,35 +43,6 @@ function formatTime(hours: number): string {
 
 function PositionCard({ position, index, total }: { position: Position; index: number; total: number }) {
   const [expanded, setExpanded] = useState(true);
-  const [copied, setCopied] = useState(false);
-
-  const heroJson = {
-    menge: position.menge,
-    einheit: position.einheit,
-    kurztext: position.kurztext,
-    langtext: position.langtext,
-    gewerk: position.gewerk,
-    arbeitszeit_h: position.arbeitszeit_h,
-    arbeitszeit_min_pro_einheit: position.arbeitszeit_min_pro_einheit,
-    arbeitskosten: position.arbeitskosten,
-    materialkosten: position.materialkosten,
-    arbeitsanteil_prozent: position.arbeitsanteil_prozent,
-    materialanteil_prozent: position.materialanteil_prozent,
-    arbeitsanteil_euro: position.arbeitsanteil_euro,
-    materialanteil_euro: position.materialanteil_euro,
-    gesamt_pro_einheit_netto: position.gesamt_pro_einheit_netto,
-  };
-
-  const copyHeroJson = async () => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(heroJson, null, 2));
-      setCopied(true);
-      toast.success('HERO JSON kopiert');
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error('Kopieren fehlgeschlagen');
-    }
-  };
 
   const gesamtNetto = position.gesamt_pro_einheit_netto * position.menge;
 
@@ -158,19 +129,6 @@ function PositionCard({ position, index, total }: { position: Position; index: n
             </div>
           </div>
 
-          {/* HERO JSON Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={copyHeroJson}
-            className="w-full"
-          >
-            {copied ? (
-              <><Check className="w-4 h-4 mr-2" />Kopiert</>
-            ) : (
-              <><Copy className="w-4 h-4 mr-2" />HERO JSON kopieren</>
-            )}
-          </Button>
         </div>
       )}
     </div>

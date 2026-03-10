@@ -366,11 +366,15 @@ export default function AdminPrompts() {
             <CollapsibleContent>
               <CardContent className="pt-0">
                 <div className="space-y-2">
-                  {prompts.map((prompt) => (
+                  {(() => {
+                    const latestVersion = Math.max(...prompts.map(p => p.version));
+                    return prompts.map((prompt) => {
+                      const isLatest = prompt.version === latestVersion;
+                      return (
                     <div
                       key={prompt.id}
                       className={`rounded-lg border ${
-                        prompt.is_active
+                        isLatest
                           ? 'border-primary/50 bg-primary/5'
                           : 'border-border/50'
                       }`}
@@ -379,7 +383,7 @@ export default function AdminPrompts() {
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">Version {prompt.version}</span>
-                            {prompt.is_active && (
+                            {isLatest && (
                               <Badge variant="default" className="text-xs">
                                 <Check className="w-3 h-3 mr-1" />
                                 Aktiv
@@ -409,7 +413,7 @@ export default function AdminPrompts() {
                             )}
                             {expandedVersions.has(prompt.id) ? 'Verbergen' : 'Anzeigen'}
                           </Button>
-                          {!prompt.is_active && (
+                          {!isLatest && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -430,7 +434,9 @@ export default function AdminPrompts() {
                         </div>
                       )}
                     </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
               </CardContent>
             </CollapsibleContent>

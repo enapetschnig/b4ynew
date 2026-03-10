@@ -27,21 +27,15 @@ export function BottomNav() {
             return (
               <button
                 key={tab.path}
-                onClick={() => !tab.disabled && navigate(tab.path)}
-                disabled={tab.disabled}
+                onClick={() => navigate(tab.path)}
                 className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg min-w-[64px] transition-colors ${
-                  tab.disabled
-                    ? 'opacity-40 cursor-not-allowed'
-                    : active
+                  active
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-[10px] font-medium leading-none">{tab.label}</span>
-                {tab.disabled && (
-                  <span className="text-[8px] text-muted-foreground leading-none">Bald</span>
-                )}
               </button>
             );
           })}
