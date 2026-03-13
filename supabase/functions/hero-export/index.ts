@@ -101,6 +101,15 @@ async function fetchAllServices(apiKey: string) {
     offset += pageSize;
   }
 
+  allItems.sort((a, b) => {
+    const nrA = String(a.nr || '');
+    const nrB = String(b.nr || '');
+    const numA = parseFloat(nrA);
+    const numB = parseFloat(nrB);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return nrA.localeCompare(nrB);
+  });
+
   return allItems;
 }
 
@@ -135,6 +144,15 @@ async function fetchAllProducts(apiKey: string) {
     if (batch.length < pageSize) break;
     offset += pageSize;
   }
+
+  allItems.sort((a, b) => {
+    const nrA = String(a.nr || '');
+    const nrB = String(b.nr || '');
+    const numA = parseFloat(nrA);
+    const numB = parseFloat(nrB);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return nrA.localeCompare(nrB);
+  });
 
   return allItems;
 }
