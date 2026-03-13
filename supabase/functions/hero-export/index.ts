@@ -104,10 +104,7 @@ async function fetchAllServices(apiKey: string) {
   allItems.sort((a, b) => {
     const nrA = String(a.nr || '');
     const nrB = String(b.nr || '');
-    const numA = parseFloat(nrA);
-    const numB = parseFloat(nrB);
-    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return nrA.localeCompare(nrB);
+    return nrA.localeCompare(nrB, undefined, { numeric: true });
   });
 
   return allItems;
@@ -148,10 +145,7 @@ async function fetchAllProducts(apiKey: string) {
   allItems.sort((a, b) => {
     const nrA = String(a.nr || '');
     const nrB = String(b.nr || '');
-    const numA = parseFloat(nrA);
-    const numB = parseFloat(nrB);
-    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return nrA.localeCompare(nrB);
+    return nrA.localeCompare(nrB, undefined, { numeric: true });
   });
 
   return allItems;

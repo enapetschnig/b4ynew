@@ -602,17 +602,19 @@ export default function Preisliste() {
           </div>
         ) : tab === 'services' ? (
           <div className="divide-y divide-border/30">
-            {filteredServices.map((s, i) => (
+            {filteredServices.map((s, i) => {
+              const isHeader = s.nr?.endsWith('-000');
+              return (
               <div key={`${s.id}-${i}`}>
                 <button
                   onClick={() => toggleRow(i)}
-                  className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
+                  className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${isHeader ? 'bg-red-50 dark:bg-red-950/30' : 'hover:bg-secondary/30'}`}
                 >
-                  <ChevronRight className={`w-4 h-4 mt-0.5 text-muted-foreground shrink-0 transition-transform ${expandedRows.has(i) ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-4 h-4 mt-0.5 shrink-0 transition-transform ${isHeader ? 'text-red-500' : 'text-muted-foreground'} ${expandedRows.has(i) ? 'rotate-90' : ''}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono text-muted-foreground">{s.nr}</span>
-                      <span className="text-sm font-medium text-foreground truncate">{s.name}</span>
+                      <span className={`text-xs font-mono ${isHeader ? 'text-red-600 dark:text-red-400 font-bold' : 'text-muted-foreground'}`}>{s.nr}</span>
+                      <span className={`text-sm font-medium truncate ${isHeader ? 'text-red-600 dark:text-red-400 font-bold' : 'text-foreground'}`}>{s.name}</span>
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       {s.manufacturer && <span>{s.manufacturer}</span>}
@@ -662,7 +664,7 @@ export default function Preisliste() {
                   </div>
                 )}
               </div>
-            ))}
+            ); })}
             {filteredServices.length === 0 && !loading && (
               <div className="py-12 text-center text-muted-foreground text-sm">
                 Keine Leistungen gefunden
