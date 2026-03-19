@@ -282,10 +282,16 @@ export default function Preisliste() {
       ? rawTotal / s.net_price_per_unit
       : 1;
 
+    const laborVkNetto = rawLabor / units;
+    const laborMinutes = rawMinutes / units;
+    const laborHours = laborMinutes / 60;
+    const laborVkPerHour = laborHours > 0 ? laborVkNetto / laborHours : 0;
+
     return {
-      laborVkNetto: Math.round((rawLabor / units) * 100) / 100,
+      laborVkNetto: Math.round(laborVkNetto * 100) / 100,
       materialVkNetto: Math.round((rawMaterial / units) * 100) / 100,
-      laborMinutes: Math.round((rawMinutes / units) * 100) / 100,
+      laborMinutes: Math.round(laborMinutes * 100) / 100,
+      laborVkPerHour: Math.round(laborVkPerHour * 100) / 100,
     };
   };
 
@@ -294,7 +300,7 @@ export default function Preisliste() {
     let blob: Blob;
     if (tab === 'services') {
       const enriched = filteredServices.map(s => {
-        const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
+        const { laborVkNetto, materialVkNetto, laborMinutes, laborVkPerHour } = calcServiceRow(s);
         return {
           ...s,
           kalkulation: {
@@ -302,6 +308,7 @@ export default function Preisliste() {
             lohn_vk_netto: laborVkNetto,
             material_vk_netto: materialVkNetto,
             lohn_minuten: laborMinutes,
+            lohn_vk_per_hour: laborVkPerHour,
           },
         };
       });
@@ -318,7 +325,7 @@ export default function Preisliste() {
     if (tab === 'services') {
       // Bau4You Excel Template format — uses Hero's own values
       const rows = filteredServices.map(s => {
-        const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
+        const { laborVkNetto, materialVkNetto, laborMinutes, laborVkPerHour } = calcServiceRow(s);
         return {
           'Leistungsnummer': s.nr || '',
           'Einheit': s.unit_type || '',
@@ -328,7 +335,7 @@ export default function Preisliste() {
           'Lohnkosten VK Netto neu / Einheit': laborVkNetto,
           'Materialkosten VK Netto neu / Einheit': materialVkNetto,
           'Lohnkosten Minuten / Einheit': laborMinutes,
-          'Lohnkosten VK Netto/ Einheit': laborVkNetto,
+          'Lohnkosten VK Netto/ Einheit': laborVkPerHour,
         };
       });
 
@@ -373,15 +380,16 @@ export default function Preisliste() {
     if (tab === 'services') {
       autoTable(doc, {
         startY: 35,
-        head: [['Nr', 'Einheit', 'Leistungsname', 'VK Netto/Einh.', 'Lohn VK Netto', 'Material VK Netto', 'Lohn Min.']],
+        head: [['Nr', 'Einheit', 'Leistungsname', 'VK Netto/Einh.', 'Lohn VK Netto', 'Material VK Netto', 'Lohn Min.', 'Lohn VK/h']],
         body: filteredServices.map(s => {
-          const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
+          const { laborVkNetto, materialVkNetto, laborMinutes, laborVkPerHour } = calcServiceRow(s);
           return [
             s.nr, s.unit_type, s.name,
             s.net_price_per_unit?.toFixed(2),
             laborVkNetto.toFixed(2),
             materialVkNetto.toFixed(2),
             laborMinutes,
+            laborVkPerHour.toFixed(2),
           ];
         }),
         styles: { fontSize: 8 },
