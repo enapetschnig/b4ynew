@@ -268,21 +268,24 @@ export default function Preisliste() {
     });
   };
 
-  // Shared calculation helper — uses Hero's own net_price_per_unit × quantity
+  // Shared calculation helper — normalizes position totals to 1 service unit
   const calcServiceRow = (s: Service) => {
     const wages = s.wages || [];
     const materials = s.materials || [];
-    const laborVkNetto = wages.reduce((sum, w) => sum + ((w.net_price_per_unit || 0) * (w.quantity || 0)), 0);
-    const materialVkNetto = materials.reduce((sum, m) => sum + ((m.net_price_per_unit || 0) * (m.quantity || 1)), 0);
-    const laborMinutes = wages.reduce((sum, w) => sum + (w.time_minutes || 0), 0);
-    const laborHours = laborMinutes / 60;
-    // Stundensatz = Gesamt-Lohn / Stunden (gewichteter Durchschnitt bei mehreren Lohngruppen)
-    const laborVkPerHour = laborHours > 0 ? laborVkNetto / laborHours : 0;
+    const rawLabor = wages.reduce((sum, w) => sum + ((w.net_price_per_unit || 0) * (w.quantity || 0)), 0);
+    const rawMaterial = materials.reduce((sum, m) => sum + ((m.net_price_per_unit || 0) * (m.quantity || 1)), 0);
+    const rawMinutes = wages.reduce((sum, w) => sum + (w.time_minutes || 0), 0);
+    const rawTotal = rawLabor + rawMaterial;
+
+    // How many service units do the positions cover? Normalize to 1.
+    const units = (rawTotal > 0 && s.net_price_per_unit > 0)
+      ? rawTotal / s.net_price_per_unit
+      : 1;
+
     return {
-      laborVkNetto: Math.round(laborVkNetto * 100) / 100,
-      materialVkNetto: Math.round(materialVkNetto * 100) / 100,
-      laborMinutes,
-      laborVkPerHour: Math.round(laborVkPerHour * 100) / 100,
+      laborVkNetto: Math.round((rawLabor / units) * 100) / 100,
+      materialVkNetto: Math.round((rawMaterial / units) * 100) / 100,
+      laborMinutes: Math.round((rawMinutes / units) * 100) / 100,
     };
   };
 
@@ -291,7 +294,7 @@ export default function Preisliste() {
     let blob: Blob;
     if (tab === 'services') {
       const enriched = filteredServices.map(s => {
-        const { laborVkNetto, materialVkNetto, laborMinutes, laborVkPerHour } = calcServiceRow(s);
+        const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
         return {
           ...s,
           kalkulation: {
@@ -299,7 +302,6 @@ export default function Preisliste() {
             lohn_vk_netto: laborVkNetto,
             material_vk_netto: materialVkNetto,
             lohn_minuten: laborMinutes,
-            lohn_vk_per_hour: laborVkPerHour,
           },
         };
       });
@@ -316,7 +318,7 @@ export default function Preisliste() {
     if (tab === 'services') {
       // Bau4You Excel Template format — uses Hero's own values
       const rows = filteredServices.map(s => {
-        const { laborVkNetto, materialVkNetto, laborMinutes, laborVkPerHour } = calcServiceRow(s);
+        const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
         return {
           'Leistungsnummer': s.nr || '',
           'Einheit': s.unit_type || '',
@@ -326,7 +328,7 @@ export default function Preisliste() {
           'Lohnkosten VK Netto neu / Einheit': laborVkNetto,
           'Materialkosten VK Netto neu / Einheit': materialVkNetto,
           'Lohnkosten Minuten / Einheit': laborMinutes,
-          'Lohnkosten VK Netto/ Einheit': laborVkPerHour,
+          'Lohnkosten VK Netto/ Einheit': laborVkNetto,
         };
       });
 
@@ -371,16 +373,15 @@ export default function Preisliste() {
     if (tab === 'services') {
       autoTable(doc, {
         startY: 35,
-        head: [['Nr', 'Einheit', 'Leistungsname', 'VK Netto/Einh.', 'Lohn VK Netto', 'Material VK Netto', 'Lohn Min.', 'Lohn VK/h']],
+        head: [['Nr', 'Einheit', 'Leistungsname', 'VK Netto/Einh.', 'Lohn VK Netto', 'Material VK Netto', 'Lohn Min.']],
         body: filteredServices.map(s => {
-          const { laborVkNetto, materialVkNetto, laborMinutes, laborVkPerHour } = calcServiceRow(s);
+          const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
           return [
             s.nr, s.unit_type, s.name,
             s.net_price_per_unit?.toFixed(2),
             laborVkNetto.toFixed(2),
             materialVkNetto.toFixed(2),
             laborMinutes,
-            laborVkPerHour.toFixed(2),
           ];
         }),
         styles: { fontSize: 8 },
