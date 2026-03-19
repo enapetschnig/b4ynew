@@ -75,6 +75,9 @@ async function fetchAllServices(apiKey: string) {
           ... on Documents_SupplyProduct {
             id nr name quantity unit_type net_price_per_unit base_price list_price
           }
+          ... on WageGroup {
+            id name wage_cost_price wage_per_hour time_minutes quantity activity
+          }
         }
       }
     }`;
@@ -88,11 +91,13 @@ async function fetchAllServices(apiKey: string) {
       if (typeof item.description === "string") {
         item.description = stripHtml(item.description);
       }
-      // Extract materials from positions
+      // Extract materials and wages from positions
       const positions = (item.positions as Record<string, unknown>[]) || [];
       const materials = positions.filter(p => p.__typename === "Documents_SupplyProduct");
+      const wages = positions.filter(p => p.__typename === "WageGroup");
       item.materials = materials;
       item.materialCount = materials.length;
+      item.wages = wages;
       delete item.positions;
     }
 

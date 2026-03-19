@@ -12,6 +12,16 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import logo from '@/assets/logo-bau4you.png';
 
+interface Wage {
+  id: string;
+  name: string;
+  wage_cost_price: number;
+  wage_per_hour: number;
+  time_minutes: number;
+  quantity: number;
+  activity: string;
+}
+
 interface Service {
   id: string;
   nr: string;
@@ -24,6 +34,7 @@ interface Service {
   time_minutes: number;
   materials: Material[];
   materialCount: number;
+  wages: Wage[];
 }
 
 interface Material {
@@ -265,22 +276,42 @@ export default function Preisliste() {
 
   const downloadXLSX = async () => {
     const XLSX = await import('xlsx');
-    const items = tab === 'services' ? filteredServices : filteredProducts;
 
-    let rows: Record<string, unknown>[];
     if (tab === 'services') {
-      rows = (items as Service[]).map(s => ({
-        Nr: s.nr,
-        Name: s.name,
-        Gewerk: s.manufacturer,
-        Einheit: s.unit_type,
-        'Preis (€)': s.net_price_per_unit,
-        'Zeit (min)': s.time_minutes,
-        Material: s.materialCount,
-        Beschreibung: s.description,
-      }));
+      // Bau4You Excel Template format
+      const rows = filteredServices.map(s => {
+        const wages = s.wages || [];
+        const materials = s.materials || [];
+
+        const laborMinutes = wages.reduce((sum, w) => sum + (w.time_minutes || 0), 0);
+        const laborVkNetto = wages.reduce((sum, w) => sum + ((w.wage_per_hour || 0) * ((w.time_minutes || 0) / 60)), 0);
+        const materialVkNetto = materials.reduce((sum, m) => sum + ((m.net_price_per_unit || 0) * (m.quantity || 1)), 0);
+
+        return {
+          'Leistungsnummer': s.nr || '',
+          'Einheit': s.unit_type || '',
+          'Leistungsname (Kurztext)': s.name || '',
+          'Beschreibung (Langtext)': s.description || '',
+          'VK Neu Netto / Einheit': Math.round((s.net_price_per_unit || 0) * 100) / 100,
+          'Lohnkosten VK Netto neu / Einheit': Math.round(laborVkNetto * 100) / 100,
+          'Materialkosten VK Netto neu / Einheit': Math.round(materialVkNetto * 100) / 100,
+          'Lohnkosten Minuten / Einheit': laborMinutes,
+          'Lohnkosten VK Netto/ Einheit': Math.round(laborVkNetto * 100) / 100,
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 18 }, { wch: 10 }, { wch: 40 }, { wch: 60 },
+        { wch: 20 }, { wch: 28 }, { wch: 32 }, { wch: 24 }, { wch: 24 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Preisliste');
+      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Bau4You_Preisliste.xlsx');
     } else {
-      rows = (items as Product[]).map(p => ({
+      const rows = filteredProducts.map(p => ({
         Nr: p.nr,
         Name: p.base_data?.name,
         Kategorie: p.base_data?.category,
@@ -289,13 +320,12 @@ export default function Preisliste() {
         'VK (€)': p.list_price,
         Beschreibung: p.base_data?.description,
       }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Artikel');
+      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `preisliste-artikel.xlsx`);
     }
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, tab === 'services' ? 'Leistungen' : 'Artikel');
-    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `preisliste-${tab}.xlsx`);
   };
 
   const downloadPDF = async () => {
@@ -635,6 +665,26 @@ export default function Preisliste() {
                   <div className="px-4 pb-3 pl-11 space-y-2">
                     {s.description && (
                       <p className="text-xs text-muted-foreground whitespace-pre-line">{s.description}</p>
+                    )}
+                    {s.wages && s.wages.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-foreground mb-1">Lohn / Maschinenkosten:</p>
+                        <div className="space-y-1">
+                          {s.wages.map((w, wi) => (
+                            <div key={wi} className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/30 rounded px-2 py-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{w.name}</span>
+                                <span className="shrink-0 ml-2">{w.time_minutes} min ({(w.time_minutes / 60).toFixed(1)} h)</span>
+                              </div>
+                              <div className="flex justify-end gap-3 mt-0.5 font-mono">
+                                <span>EK {w.wage_cost_price?.toFixed(2)}€/h</span>
+                                <span>VK {w.wage_per_hour?.toFixed(2)}€/h</span>
+                                <span className="font-semibold">= {(w.wage_per_hour * w.time_minutes / 60).toFixed(2)}€</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                     {s.materials && s.materials.length > 0 && (
                       <div>
