@@ -40,7 +40,7 @@ Erstelle zusätzlich einen kurzen, sachlichen Betreff, der den Inhalt der E-Mail
 Der Betreff wird ausschließlich in das Betreff-Feld eingefügt und nicht im Text wiederholt.
 Der E-Mail-Text beginnt direkt mit der korrekten Anrede.
 
-Es wird keine Signatur erzeugt oder variiert. Die Signatur wird immer einheitlich vom System ergänzt.`;
+WICHTIG: Erzeuge NIEMALS eine Signatur, Grußformel oder Abschluss wie "Viele Grüße", "Mit freundlichen Grüßen", "Beste Grüße", "Liebe Grüße", "Herzliche Grüße", "MfG" oder ähnliches. Der E-Mail-Text endet nach dem letzten inhaltlichen Satz. Die Signatur wird automatisch vom System angehängt.`;
 
 const DEFAULT_WHATSAPP_PROMPT = `Du bist der persönliche Kommunikationsassistent von Lukasz Baranowski.
 Deine Aufgabe ist es, gesprochene WhatsApp-Nachrichten in klare, professionelle Texte umzuwandeln.
@@ -63,6 +63,12 @@ Abschluss je nach Anredeform:
 - Sie-Form: "Liebe Grüße, Lukasz Baranowski"
 
 Es wird keine weitere Signatur vom System ergänzt.`;
+
+// Strip trailing greeting/signature that the LLM might generate despite instructions
+function stripTrailingGreeting(body: string): string {
+  const greetingPattern = /\n\n?(Viele Grüße|Mit freundlichen Grüßen|Beste Grüße|Freundliche Grüße|Liebe Grüße|Herzliche Grüße|MfG|LG|Grüße),?\n.*$/is;
+  return body.replace(greetingPattern, '').trimEnd();
+}
 
 // Call Gemini API directly
 async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
@@ -251,6 +257,7 @@ Aufgaben:
 ${channel === 'whatsapp' && !whatsappIncludeSubject ? '5. Erstelle KEINEN Betreff für WhatsApp-Nachrichten. Das subject-Feld soll leer sein.' : '5. Erstelle IMMER einen kurzen, prägnanten Betreff der den Inhalt zusammenfasst'}
 ${channel === 'whatsapp' && useWhatsappSignature && whatsappSignature ? `6. Verwende exakt diese Signatur als Abschluss der Nachricht (NICHT verändern): "${whatsappSignature}"` : ''}
 ${channel === 'whatsapp' && !useWhatsappSignature ? '6. Füge KEINEN Abschlussgruß oder Signatur ein. Die Nachricht endet nach dem inhaltlichen Text.' : ''}
+${channel === 'email' ? '7. WICHTIG: Der body darf KEINE Grußformel oder Signatur am Ende enthalten (kein "Viele Grüße", "Mit freundlichen Grüßen", "Beste Grüße", "LG" etc.). Der Text endet nach dem letzten inhaltlichen Satz. Die Signatur wird automatisch vom System ergänzt.' : ''}
 
 Antworte NUR im folgenden JSON-Format:
 {
@@ -310,6 +317,10 @@ Antworte NUR im folgenden JSON-Format:
     let draft;
     try {
       draft = JSON.parse(jsonContent);
+      // Strip any trailing greeting the LLM generated despite instructions (email only)
+      if (channel === 'email' && draft.body) {
+        draft.body = stripTrailingGreeting(draft.body);
+      }
       console.log(`AI response parsed: subject="${draft.subject || ''}", addressForm="${draft.addressForm}", matchedContact="${draft.matchedContact}", promptSource=${promptSource}`);
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", content);
