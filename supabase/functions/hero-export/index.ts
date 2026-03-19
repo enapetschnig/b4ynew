@@ -76,7 +76,7 @@ async function fetchAllServices(apiKey: string) {
             id nr name quantity unit_type net_price_per_unit base_price list_price
           }
           ... on WageGroup {
-            id name wage_cost_price wage_per_hour time_minutes quantity activity
+            id name wage_cost_price wage_per_hour net_price_per_unit time_minutes quantity activity
           }
         }
       }

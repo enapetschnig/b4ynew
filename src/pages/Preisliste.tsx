@@ -17,6 +17,7 @@ interface Wage {
   name: string;
   wage_cost_price: number;
   wage_per_hour: number;
+  net_price_per_unit: number;
   time_minutes: number;
   quantity: number;
   activity: string;
@@ -267,10 +268,36 @@ export default function Preisliste() {
     });
   };
 
+  // Shared calculation helper — uses Hero's own net_price_per_unit × quantity
+  const calcServiceRow = (s: Service) => {
+    const wages = s.wages || [];
+    const materials = s.materials || [];
+    const laborVkNetto = wages.reduce((sum, w) => sum + ((w.net_price_per_unit || 0) * (w.quantity || 0)), 0);
+    const materialVkNetto = materials.reduce((sum, m) => sum + ((m.net_price_per_unit || 0) * (m.quantity || 1)), 0);
+    const laborMinutes = wages.reduce((sum, w) => sum + (w.time_minutes || 0), 0);
+    return { laborVkNetto: Math.round(laborVkNetto * 100) / 100, materialVkNetto: Math.round(materialVkNetto * 100) / 100, laborMinutes };
+  };
+
   // Downloads
   const downloadJSON = () => {
-    const items = tab === 'services' ? filteredServices : filteredProducts;
-    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    let blob: Blob;
+    if (tab === 'services') {
+      const enriched = filteredServices.map(s => {
+        const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
+        return {
+          ...s,
+          kalkulation: {
+            vk_netto_einheit: s.net_price_per_unit,
+            lohn_vk_netto: laborVkNetto,
+            material_vk_netto: materialVkNetto,
+            lohn_minuten: laborMinutes,
+          },
+        };
+      });
+      blob = new Blob([JSON.stringify(enriched, null, 2)], { type: 'application/json' });
+    } else {
+      blob = new Blob([JSON.stringify(filteredProducts, null, 2)], { type: 'application/json' });
+    }
     downloadBlob(blob, `preisliste-${tab}.json`);
   };
 
@@ -278,25 +305,19 @@ export default function Preisliste() {
     const XLSX = await import('xlsx');
 
     if (tab === 'services') {
-      // Bau4You Excel Template format
+      // Bau4You Excel Template format — uses Hero's own values
       const rows = filteredServices.map(s => {
-        const wages = s.wages || [];
-        const materials = s.materials || [];
-
-        const laborMinutes = wages.reduce((sum, w) => sum + (w.time_minutes || 0), 0);
-        const laborVkNetto = wages.reduce((sum, w) => sum + ((w.wage_per_hour || 0) * ((w.time_minutes || 0) / 60)), 0);
-        const materialVkNetto = materials.reduce((sum, m) => sum + ((m.net_price_per_unit || 0) * (m.quantity || 1)), 0);
-
+        const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
         return {
           'Leistungsnummer': s.nr || '',
           'Einheit': s.unit_type || '',
           'Leistungsname (Kurztext)': s.name || '',
           'Beschreibung (Langtext)': s.description || '',
           'VK Neu Netto / Einheit': Math.round((s.net_price_per_unit || 0) * 100) / 100,
-          'Lohnkosten VK Netto neu / Einheit': Math.round(laborVkNetto * 100) / 100,
-          'Materialkosten VK Netto neu / Einheit': Math.round(materialVkNetto * 100) / 100,
+          'Lohnkosten VK Netto neu / Einheit': laborVkNetto,
+          'Materialkosten VK Netto neu / Einheit': materialVkNetto,
           'Lohnkosten Minuten / Einheit': laborMinutes,
-          'Lohnkosten VK Netto/ Einheit': Math.round(laborVkNetto * 100) / 100,
+          'Lohnkosten VK Netto/ Einheit': laborVkNetto,
         };
       });
 
@@ -341,11 +362,17 @@ export default function Preisliste() {
     if (tab === 'services') {
       autoTable(doc, {
         startY: 35,
-        head: [['Nr', 'Name', 'Gewerk', 'Einheit', 'Preis (€)', 'Zeit (min)', 'Material']],
-        body: filteredServices.map(s => [
-          s.nr, s.name, s.manufacturer, s.unit_type,
-          s.net_price_per_unit?.toFixed(2), s.time_minutes, s.materialCount,
-        ]),
+        head: [['Nr', 'Einheit', 'Leistungsname', 'VK Netto/Einh.', 'Lohn VK Netto', 'Material VK Netto', 'Lohn Min.']],
+        body: filteredServices.map(s => {
+          const { laborVkNetto, materialVkNetto, laborMinutes } = calcServiceRow(s);
+          return [
+            s.nr, s.unit_type, s.name,
+            s.net_price_per_unit?.toFixed(2),
+            laborVkNetto.toFixed(2),
+            materialVkNetto.toFixed(2),
+            laborMinutes,
+          ];
+        }),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [59, 130, 246] },
       });
